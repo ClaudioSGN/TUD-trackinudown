@@ -13,9 +13,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Baixar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Configurar Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -27,5 +27,17 @@ jobs:
         run: npm test
       - name: Compilar e publicar release
         run: npm run build && npx electron-builder --win nsis --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Garantir arquivos da atualização
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $installer = "release/TUD Setup $version.exe"
+          $remoteInstaller = "release/TUD-Setup-$version.exe"
+          $remoteBlockmap = "$remoteInstaller.blockmap"
+          Copy-Item -LiteralPath $installer -Destination $remoteInstaller -Force
+          Copy-Item -LiteralPath "$installer.blockmap" -Destination $remoteBlockmap -Force
+          gh release upload $env:GITHUB_REF_NAME $remoteInstaller $remoteBlockmap "release/latest.yml" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
