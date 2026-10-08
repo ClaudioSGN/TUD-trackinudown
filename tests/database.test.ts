@@ -111,4 +111,16 @@ describe('TudDatabase', () => {
     database.markReminderNotified(id)
     expect(database.dueReminders()).toHaveLength(0)
   })
+
+  it('cadastra, pesquisa, edita e exclui gestores e equipes de T.I.', () => {
+    const condominioId = database.createCondominio({ nome: 'Residencial Vitória' })
+    const gestorId = database.createContact({ tipo: 'Gestor', nome: 'Márcia Souza', telefone: '(34) 99999-0000', condominioId })
+    const tiId = database.createContact({ tipo: 'Equipe de T.I.', nome: 'Núcleo Técnico', empresa: 'Suporte Ágil', email: 'ti@exemplo.com' })
+    expect(database.listContacts('marcia')).toMatchObject([{ id: gestorId, condominio_nome: 'Residencial Vitória' }])
+    expect(database.listContacts('', 'Equipe de T.I.')).toMatchObject([{ id: tiId, nome: 'Núcleo Técnico' }])
+    database.updateContact(tiId, { tipo: 'Equipe de T.I.', nome: 'Núcleo Técnico 24h', empresa: 'Suporte Ágil' })
+    expect(database.listContacts('24h')[0].nome).toBe('Núcleo Técnico 24h')
+    database.removeContact(gestorId)
+    expect(database.listContacts('marcia')).toHaveLength(0)
+  })
 })

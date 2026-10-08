@@ -21,6 +21,7 @@ const api: TudApi = {
   },
   dashboard: { summary: period => invoke('dashboard:summary', period) },
   lembretes: { list: includeCompleted => invoke('lembretes:list', includeCompleted), create: input => invoke('lembretes:create', input), setDone: (id, done) => invoke('lembretes:done', id, done), remove: id => invoke('lembretes:remove', id) },
+  contatos: { list: (search, tipo) => invoke('contatos:list', search, tipo), create: input => invoke('contatos:create', input), update: (id, input) => invoke('contatos:update', id, input), remove: id => invoke('contatos:remove', id) },
   quickAdd: { create: input => invoke('quick:create', input) },
   backup: { create: folder => invoke('backup:create', folder), restore: () => invoke('backup:restore') },
   export: { csv: condominioId => invoke('export:csv', condominioId) },

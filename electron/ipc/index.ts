@@ -9,6 +9,8 @@ const condo = z.object({ nome: z.string().min(1).max(120), endereco: z.string().
 const attendance = z.object({ condominioId: id, titulo: z.string().min(1).max(200), descricao: z.string().optional(), categoria: z.string().optional(), status: z.enum(['Aberto','Em andamento','Concluído']).optional(), prioridade: z.enum(['Baixa','Normal','Alta']).optional(), dataAtendimento: z.string().optional() })
 const attendanceUpdate = z.object({ text: z.string().trim().max(5000).optional(), categoria: z.string().trim().min(1).max(120).optional(), status: z.enum(['Aberto','Em andamento','Concluído']).optional() })
 const reminder = z.object({ titulo: z.string().trim().min(1).max(200), observacoes: z.string().max(2000).optional(), lembreteEm: z.string().datetime(), atendimentoId: id.optional() })
+const contactType = z.enum(['Gestor', 'Equipe de T.I.'])
+const contact = z.object({ tipo: contactType, nome: z.string().trim().min(1).max(160), empresa: z.string().max(160).optional(), telefone: z.string().max(80).optional(), email: z.string().email('Informe um e-mail válido.').max(200).or(z.literal('')).optional(), condominioId: id.nullable().optional(), observacoes: z.string().max(3000).optional() })
 
 export function registerIpc(database: TudDatabase, files: FileService, root: string) {
   const handle = (channel: string, fn: (...args: any[]) => any) => ipcMain.handle(channel, async (_event, ...args) => fn(...args))
@@ -41,6 +43,10 @@ export function registerIpc(database: TudDatabase, files: FileService, root: str
   handle('lembretes:create', (input: unknown) => database.createReminder(reminder.parse(input)))
   handle('lembretes:done', (rawId: unknown, done: unknown) => database.setReminderDone(id.parse(rawId), z.boolean().parse(done)))
   handle('lembretes:remove', (rawId: unknown) => database.removeReminder(id.parse(rawId)))
+  handle('contatos:list', (search?: unknown, tipo?: unknown) => database.listContacts(z.string().max(200).catch('').parse(search), z.union([contactType, z.literal('')]).catch('').parse(tipo)))
+  handle('contatos:create', (input: unknown) => database.createContact(contact.parse(input)))
+  handle('contatos:update', (rawId: unknown, input: unknown) => database.updateContact(id.parse(rawId), contact.parse(input)))
+  handle('contatos:remove', (rawId: unknown) => database.removeContact(id.parse(rawId)))
   handle('settings:get', () => database.settings())
   handle('settings:set', (patch: any) => database.setSettings(patch))
   handle('backup:create', (folder?: string) => createBackup(database, root, folder))

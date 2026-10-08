@@ -45,6 +45,16 @@ CREATE TABLE IF NOT EXISTS lembretes (
   concluido INTEGER NOT NULL DEFAULT 0, notificado_em TEXT, criado_em TEXT NOT NULL, concluido_em TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_lembretes_estado_data ON lembretes(concluido, lembrete_em);
+CREATE TABLE IF NOT EXISTS contatos (
+  id INTEGER PRIMARY KEY,
+  tipo TEXT NOT NULL CHECK (tipo IN ('Gestor','Equipe de T.I.')),
+  nome TEXT NOT NULL, busca_norm TEXT NOT NULL,
+  empresa TEXT NOT NULL DEFAULT '', telefone TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '',
+  condominio_id INTEGER REFERENCES condominios(id) ON DELETE SET NULL,
+  observacoes TEXT NOT NULL DEFAULT '', criado_em TEXT NOT NULL, atualizado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_contatos_tipo_nome ON contatos(tipo, nome COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_contatos_condominio ON contatos(condominio_id);
 CREATE VIRTUAL TABLE IF NOT EXISTS atendimentos_fts USING fts5(
   titulo, descricao, content='atendimentos', content_rowid='id', tokenize='unicode61 remove_diacritics 2'
 );

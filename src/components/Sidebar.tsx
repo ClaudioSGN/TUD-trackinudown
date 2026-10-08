@@ -1,4 +1,4 @@
-import { Bell, LayoutDashboard, ListTodo, Plus, Settings } from 'lucide-react'
+import { Bell, BookUser, LayoutDashboard, ListTodo, Plus, Settings } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import type { Condominio } from '../types/domain'
 import { initials } from '../lib/format'
@@ -20,7 +20,7 @@ export function Sidebar({ condominios }: { condominios: Condominio[] }) {
         </button>)}
       </div>
     </section>
-    <div className="reminder-nav"><button className={`nav-button ${route.page === 'reminders' ? 'active' : ''}`} onClick={() => navigate({ page: 'reminders' })}><Bell/><span>Lembretes</span>{reminders.length > 0 && <span className="count">{reminders.length}</span>}</button></div>
+    <div className="reminder-nav"><button className={`nav-button ${route.page === 'contacts' ? 'active' : ''}`} onClick={() => navigate({ page: 'contacts' })}><BookUser/><span>Contatos</span></button><button className={`nav-button ${route.page === 'reminders' ? 'active' : ''}`} onClick={() => navigate({ page: 'reminders' })}><Bell/><span>Lembretes</span>{reminders.length > 0 && <span className="count">{reminders.length}</span>}</button></div>
     <div className="sidebar-footer"><button className={`nav-button ${route.page === 'preferences' ? 'active' : ''}`} onClick={() => navigate({ page: 'preferences' })}><Settings/><span>Preferências</span></button></div>
   </aside>
 }

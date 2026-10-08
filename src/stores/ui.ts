@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type Route = { page: 'dashboard' | 'all' | 'condo' | 'reminders' | 'preferences'; condominioId?: number }
+export type Route = { page: 'dashboard' | 'all' | 'condo' | 'contacts' | 'reminders' | 'preferences'; condominioId?: number }
 interface UiState {
   route: Route; drawerId: number | 'new' | null; condoModal: number | 'new' | null; quickOpen: boolean
   navigate(route: Route): void; openDrawer(id?: number): void; closeDrawer(): void
