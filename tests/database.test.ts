@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { TudDatabase } from '../electron/db/database'
+import { FileService } from '../electron/services/files'
 
 describe('TudDatabase', () => {
   let root = ''
@@ -25,11 +26,21 @@ describe('TudDatabase', () => {
     expect(database.settings().theme).toBe('dark')
   })
 
-  it('lista todos os status do condomínio do mais recente para o mais antigo', () => {
+  it('lista os atendimentos por ID crescente por padrão e mantém a opção de mais recentes', () => {
     const id = database.createCondominio({ nome: 'Aurora' })
     database.createAtendimento({ condominioId: id, titulo: 'Primeiro', status: 'Concluído', dataAtendimento: '2026-01-01T10:00:00.000Z' })
     database.createAtendimento({ condominioId: id, titulo: 'Segundo', status: 'Aberto', dataAtendimento: '2026-02-01T10:00:00.000Z' })
-    expect(database.listAtendimentos({ condominioId: id }).map(x => x.titulo)).toEqual(['Segundo', 'Primeiro'])
+    expect(database.listAtendimentos({ condominioId: id }).map(x => x.titulo)).toEqual(['Primeiro', 'Segundo'])
+    expect(database.listAtendimentos({ condominioId: id, sort: 'recentes' }).map(x => x.titulo)).toEqual(['Segundo', 'Primeiro'])
+  })
+
+  it('salva imagem recebida em memória como anexo do atendimento', () => {
+    const condominioId = database.createCondominio({ nome: 'Parque das Águas' })
+    const atendimentoId = database.createAtendimento({ condominioId, titulo: 'Imagem colada' })
+    const files = new FileService(root, database)
+    const attachment = files.addBuffer(atendimentoId, new Uint8Array([137, 80, 78, 71]), 'image/png', 'captura.png')
+    expect(database.getAtendimento(atendimentoId)?.anexos).toMatchObject([{ id: attachment.id, nome_original: 'captura.png', bytes: 4 }])
+    expect(fs.existsSync(path.join(root, attachment.caminho))).toBe(true)
   })
 
   it('faz busca sem diferenciar acentos', () => {

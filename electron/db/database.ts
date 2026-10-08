@@ -123,7 +123,7 @@ export class TudDatabase {
         clauses.push('a.id IN (SELECT rowid FROM atendimentos_fts WHERE atendimentos_fts MATCH ?)'); params.push(query)
       }
     }
-    const order = filters.sort === 'antigos' ? 'a.data_atendimento ASC' : filters.sort === 'prioridade' ? `CASE a.prioridade WHEN 'Alta' THEN 0 WHEN 'Normal' THEN 1 ELSE 2 END,a.data_atendimento DESC` : filters.sort === 'status' ? `CASE a.status WHEN 'Aberto' THEN 0 WHEN 'Em andamento' THEN 1 ELSE 2 END,a.data_atendimento DESC` : 'a.data_atendimento DESC'
+    const order = filters.sort === 'recentes' ? 'a.data_atendimento DESC,a.id DESC' : filters.sort === 'antigos' ? 'a.data_atendimento ASC,a.id ASC' : filters.sort === 'prioridade' ? `CASE a.prioridade WHEN 'Alta' THEN 0 WHEN 'Normal' THEN 1 ELSE 2 END,a.id ASC` : filters.sort === 'status' ? `CASE a.status WHEN 'Aberto' THEN 0 WHEN 'Em andamento' THEN 1 ELSE 2 END,a.id ASC` : 'a.id ASC'
     const limit = filters.limit ? ` LIMIT ${Math.max(1, Math.min(1000, filters.limit))}` : ''
     return this.db.prepare(`SELECT a.*,c.nome condominio_nome,(SELECT COUNT(*) FROM anexos x WHERE x.atendimento_id=a.id) anexo_count FROM atendimentos a JOIN condominios c ON c.id=a.condominio_id WHERE ${clauses.join(' AND ')} ORDER BY ${order}${limit}`).all(...params) as Atendimento[]
   }
@@ -283,7 +283,7 @@ export class TudDatabase {
       kpis: { total, abertos: Number(k.abertos || 0), concluidos, condominios: Number(k.condominios || 0), taxa: total ? Math.round(concluidos / total * 100) : 0 },
       previous: { total: 0, abertos: 0, concluidos: 0, condominios: 0 }, ranking, monthly,
       categories: breakdown('categoria'), statuses: breakdown('status'),
-      recent: this.listAtendimentos({ ...({ periodo: period } as any), limit: 8 }),
+      recent: this.listAtendimentos({ ...({ periodo: period } as any), sort: 'recentes', limit: 8 }),
       oldest: this.listAtendimentos({ status: 'Aberto', sort: 'antigos', limit: 8 })
     }
   }

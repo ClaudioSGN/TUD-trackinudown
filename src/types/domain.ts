@@ -109,7 +109,7 @@ export interface AtendimentoFilters {
   prioridade?: Prioridade | ''
   categoria?: string
   periodo?: Periodo
-  sort?: 'recentes' | 'antigos' | 'prioridade' | 'status'
+  sort?: 'id' | 'recentes' | 'antigos' | 'prioridade' | 'status'
   limit?: number
 }
 

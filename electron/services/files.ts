@@ -17,7 +17,11 @@ export class FileService {
     fs.mkdirSync(this.attachments, { recursive: true }); fs.mkdirSync(this.thumbnails, { recursive: true })
   }
 
-  addPaths(atendimentoId: number, paths: string[]) { return paths.map(file => this.addPath(atendimentoId, file)) }
+  addPaths(atendimentoId: number, paths: string[]) {
+    const added: Anexo[] = []
+    try { for (const file of paths) added.push(this.addPath(atendimentoId, file)); return added }
+    catch (error) { added.forEach(attachment => this.remove(attachment.id)); throw error }
+  }
 
   addPath(atendimentoId: number, source: string): Anexo {
     const stat = fs.statSync(source); if (stat.size > 20 * 1024 * 1024) throw new Error('Cada imagem pode ter no máximo 20 MB.')
