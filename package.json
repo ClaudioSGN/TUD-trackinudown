@@ -1,0 +1,105 @@
+{
+  "name": "tud-desktop",
+  "version": "3.1.0",
+  "description": "TUD — Tracking u Down",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ClaudioSGN/TUD-trackinudown.git"
+  },
+  "main": "out/main/main.js",
+  "author": "TUD",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
+    "dist": "npm run build && electron-builder --win nsis --x64",
+    "release": "npm run typecheck && npm test && npm run build && electron-builder --win nsis --x64 --publish always",
+    "pack": "npm run build && electron-builder --win dir --x64"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "latest",
+    "@fontsource-variable/inter-tight": "latest",
+    "@fontsource-variable/newsreader": "latest",
+    "@tanstack/react-query": "latest",
+    "archiver": "latest",
+    "better-sqlite3": "13.0.3",
+    "date-fns": "latest",
+    "electron-updater": "^6.8.9",
+    "fflate": "latest",
+    "lucide-react": "latest",
+    "motion": "latest",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-hook-form": "latest",
+    "react-router-dom": "latest",
+    "zod": "latest",
+    "zustand": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "latest",
+    "@types/archiver": "latest",
+    "@types/better-sqlite3": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "png-to-ico": "latest",
+    "sharp": "latest",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "vite": "7.3.7",
+    "vitest": "latest"
+  },
+  "build": {
+    "appId": "com.pessoal.tud",
+    "productName": "TUD",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "TUD Setup ${version}.${ext}",
+      "icon": "resources/icon.ico"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "ClaudioSGN",
+      "repo": "TUD-trackinudown",
+      "releaseType": "release"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TUD",
+      "runAfterFinish": true,
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico"
+    },
+    "npmRebuild": false
+  }
+}
