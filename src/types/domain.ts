@@ -7,6 +7,10 @@ export interface Condominio {
   nome: string
   endereco: string
   contato: string
+  gestor_nome: string
+  gestor_contato: string
+  ti_nome: string
+  ti_contato: string
   observacoes: string
   arquivado: number
   criado_em: string
@@ -89,32 +93,6 @@ export interface LembreteInput {
   observacoes?: string
   lembreteEm: string
   atendimentoId?: number
-}
-
-export type ContatoTipo = 'Gestor' | 'Equipe de T.I.'
-
-export interface Contato {
-  id: number
-  tipo: ContatoTipo
-  nome: string
-  empresa: string
-  telefone: string
-  email: string
-  condominio_id: number | null
-  condominio_nome: string | null
-  observacoes: string
-  criado_em: string
-  atualizado_em: string
-}
-
-export interface ContatoInput {
-  tipo: ContatoTipo
-  nome: string
-  empresa?: string
-  telefone?: string
-  email?: string
-  condominioId?: number | null
-  observacoes?: string
 }
 
 export interface AppUpdateState {
@@ -200,12 +178,6 @@ export interface TudApi {
     list(includeCompleted?: boolean): Promise<Lembrete[]>
     create(input: LembreteInput): Promise<number>
     setDone(id: number, done: boolean): Promise<void>
-    remove(id: number): Promise<void>
-  }
-  contatos: {
-    list(search?: string, tipo?: ContatoTipo | ''): Promise<Contato[]>
-    create(input: ContatoInput): Promise<number>
-    update(id: number, input: ContatoInput): Promise<void>
     remove(id: number): Promise<void>
   }
   quickAdd: { create(input: { condominioId: number; titulo: string }): Promise<number> }

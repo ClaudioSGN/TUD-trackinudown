@@ -112,15 +112,26 @@ describe('TudDatabase', () => {
     expect(database.dueReminders()).toHaveLength(0)
   })
 
-  it('cadastra, pesquisa, edita e exclui gestores e equipes de T.I.', () => {
-    const condominioId = database.createCondominio({ nome: 'Residencial Vitória' })
-    const gestorId = database.createContact({ tipo: 'Gestor', nome: 'Márcia Souza', telefone: '(34) 99999-0000', condominioId })
-    const tiId = database.createContact({ tipo: 'Equipe de T.I.', nome: 'Núcleo Técnico', empresa: 'Suporte Ágil', email: 'ti@exemplo.com' })
-    expect(database.listContacts('marcia')).toMatchObject([{ id: gestorId, condominio_nome: 'Residencial Vitória' }])
-    expect(database.listContacts('', 'Equipe de T.I.')).toMatchObject([{ id: tiId, nome: 'Núcleo Técnico' }])
-    database.updateContact(tiId, { tipo: 'Equipe de T.I.', nome: 'Núcleo Técnico 24h', empresa: 'Suporte Ágil' })
-    expect(database.listContacts('24h')[0].nome).toBe('Núcleo Técnico 24h')
-    database.removeContact(gestorId)
-    expect(database.listContacts('marcia')).toHaveLength(0)
+  it('salva gestor e equipe de T.I. dentro do perfil do condomínio', () => {
+    const id = database.createCondominio({ nome: 'Residencial Vitória', gestor_nome: 'Márcia Souza', gestor_contato: '(34) 99999-0000', ti_nome: 'Núcleo Técnico', ti_contato: 'ti@exemplo.com' })
+    expect(database.listCondominios()[0]).toMatchObject({ id, gestor_nome: 'Márcia Souza', gestor_contato: '(34) 99999-0000', ti_nome: 'Núcleo Técnico', ti_contato: 'ti@exemplo.com' })
+    database.updateCondominio(id, { nome: 'Residencial Vitória', gestor_nome: 'Márcia Oliveira', gestor_contato: 'marcia@exemplo.com', ti_nome: 'Suporte 24h', ti_contato: '(34) 3333-0000' })
+    expect(database.listCondominios()[0]).toMatchObject({ gestor_nome: 'Márcia Oliveira', gestor_contato: 'marcia@exemplo.com', ti_nome: 'Suporte 24h', ti_contato: '(34) 3333-0000' })
+  })
+
+  it('migra contatos vinculados da versão 3.2.0 para o perfil do condomínio', () => {
+    const condominioId = database.createCondominio({ nome: 'Jardins Central' })
+    database.db.exec(`CREATE TABLE contatos (
+      id INTEGER PRIMARY KEY, tipo TEXT NOT NULL, nome TEXT NOT NULL, busca_norm TEXT NOT NULL,
+      empresa TEXT NOT NULL DEFAULT '', telefone TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '',
+      condominio_id INTEGER REFERENCES condominios(id) ON DELETE SET NULL,
+      observacoes TEXT NOT NULL DEFAULT '', criado_em TEXT NOT NULL, atualizado_em TEXT NOT NULL
+    )`)
+    database.db.prepare(`INSERT INTO contatos(tipo,nome,busca_norm,empresa,telefone,email,condominio_id,observacoes,criado_em,atualizado_em)
+      VALUES(?,?,?,?,?,?,?,?,?,?)`).run('Gestor', 'Carlos Lima', 'carlos lima', '', '(34) 98888-0000', 'carlos@exemplo.com', condominioId, '', new Date().toISOString(), new Date().toISOString())
+    database.db.pragma('user_version = 7')
+    database.close()
+    database = new TudDatabase(root)
+    expect(database.listCondominios()[0]).toMatchObject({ gestor_nome: 'Carlos Lima', gestor_contato: '(34) 98888-0000 · carlos@exemplo.com' })
   })
 })

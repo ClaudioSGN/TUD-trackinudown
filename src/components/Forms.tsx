@@ -6,13 +6,30 @@ import type { AppSettings, AtendimentoInput, Condominio } from '../types/domain'
 import { useUi } from '../stores/ui'
 
 export function CondominioModal({ condominios }: { condominios: Condominio[] }) {
-  const { condoModal, closeCondo, navigate }=useUi(); const query=useQueryClient(); const editing=typeof condoModal==='number'; const current=editing?condominios.find(x=>x.id===condoModal):undefined
-  const {register,handleSubmit,reset,formState:{errors,isSubmitting}}=useForm<Partial<Condominio>>({defaultValues:current||{nome:'',endereco:'',contato:'',observacoes:''}})
-  useEffect(()=>reset(current||{nome:'',endereco:'',contato:'',observacoes:''}),[current,reset])
-  if(condoModal===null)return null
-  const save=handleSubmit(async values=>{if(editing)await window.tud.condominios.update(condoModal as number,values);else{const id=await window.tud.condominios.create(values);navigate({page:'condo',condominioId:id})}await query.invalidateQueries();closeCondo()})
-  const archive=async()=>{if(!editing||!confirm(`Arquivar “${current?.nome}”? O histórico será mantido.`))return;await window.tud.condominios.archive(condoModal as number);navigate({page:'dashboard'});await query.invalidateQueries();closeCondo()}
-  return <div className="modal-wrap" onMouseDown={e=>{if(e.target===e.currentTarget)closeCondo()}}><form className="modal" onSubmit={save}><span className="eyebrow">{editing?'Editar condomínio':'Novo condomínio'}</span><h2>{editing?'Editar':'Novo'} <em>condomínio</em></h2><Field label="Nome" error={errors.nome?.message}><input autoFocus {...register('nome',{required:'Informe o nome do condomínio.'})}/></Field><Field label="Endereço"><input {...register('endereco')}/></Field><Field label="Contato"><input {...register('contato')}/></Field><Field label="Observações"><textarea {...register('observacoes')}/></Field><div className="modal-foot">{editing&&<button type="button" className="ghost danger" onClick={archive}>Arquivar</button>}<button type="button" className="ghost" onClick={closeCondo}>Cancelar</button><button className="primary" disabled={isSubmitting}>Salvar</button></div></form></div>
+  const { condoModal, closeCondo, navigate } = useUi()
+  const query = useQueryClient()
+  const editing = typeof condoModal === 'number'
+  const current = editing ? condominios.find(item => item.id === condoModal) : undefined
+  const blank = { nome: '', endereco: '', contato: '', gestor_nome: '', gestor_contato: '', ti_nome: '', ti_contato: '', observacoes: '' }
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<Partial<Condominio>>({ defaultValues: current || blank })
+  useEffect(() => reset(current || blank), [current, reset])
+  if (condoModal === null) return null
+  const save = handleSubmit(async values => {
+    if (editing) await window.tud.condominios.update(condoModal as number, values)
+    else { const id = await window.tud.condominios.create(values); navigate({ page: 'condo', condominioId: id }) }
+    await query.invalidateQueries(); closeCondo()
+  })
+  const archive = async () => {
+    if (!editing || !confirm(`Arquivar “${current?.nome}”? O histórico será mantido.`)) return
+    await window.tud.condominios.archive(condoModal as number); navigate({ page: 'dashboard' }); await query.invalidateQueries(); closeCondo()
+  }
+  return <div className="modal-wrap" onMouseDown={event => { if (event.target === event.currentTarget) closeCondo() }}><form className="modal condo-modal" onSubmit={save}>
+    <span className="eyebrow">{editing ? 'Editar condomínio' : 'Novo condomínio'}</span><h2>{editing ? 'Editar' : 'Novo'} <em>condomínio</em></h2>
+    <section className="condo-form-section"><h3>Informações gerais</h3><Field label="Nome" error={errors.nome?.message}><input autoFocus {...register('nome', { required: 'Informe o nome do condomínio.' })}/></Field><Field label="Endereço"><input {...register('endereco')}/></Field><Field label="Contato geral"><input {...register('contato')} placeholder="Telefone, e-mail ou portaria"/></Field></section>
+    <div className="condo-people-grid"><section className="condo-form-section"><h3>Gestor responsável</h3><Field label="Nome"><input {...register('gestor_nome')} placeholder="Ex.: Ana Ribeiro"/></Field><Field label="Contato"><input {...register('gestor_contato')} placeholder="Telefone ou e-mail"/></Field></section><section className="condo-form-section"><h3>Equipe de T.I.</h3><Field label="Equipe ou empresa"><input {...register('ti_nome')} placeholder="Ex.: Suporte N1"/></Field><Field label="Contato"><input {...register('ti_contato')} placeholder="Telefone ou e-mail"/></Field></section></div>
+    <section className="condo-form-section"><Field label="Observações"><textarea {...register('observacoes')}/></Field></section>
+    <div className="modal-foot">{editing && <button type="button" className="ghost danger" onClick={archive}>Arquivar</button>}<button type="button" className="ghost" onClick={closeCondo}>Cancelar</button><button className="primary" disabled={isSubmitting}>{isSubmitting ? 'Salvando…' : 'Salvar'}</button></div>
+  </form></div>
 }
 
 export function AttendanceDrawer({ condominios, settings, preferredCondo }: { condominios: Condominio[]; settings: AppSettings; preferredCondo?: number }) {

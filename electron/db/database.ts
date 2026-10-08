@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { AppSettings, Atendimento, AtendimentoAtualizacao, AtendimentoFilters, AtendimentoInput, AtendimentoUpdateInput, Condominio, Contato, ContatoInput, ContatoTipo, DashboardData, Lembrete, LembreteInput, Periodo, Status } from '../../src/types/domain'
+import type { AppSettings, Atendimento, AtendimentoAtualizacao, AtendimentoFilters, AtendimentoInput, AtendimentoUpdateInput, Condominio, DashboardData, Lembrete, LembreteInput, Periodo, Status } from '../../src/types/domain'
 import migration from './migrations/001_init.sql?raw'
 
 const defaultCategories = ['Suporte remoto', 'Elétrica', 'Infraestrutura', 'Visita']
@@ -26,6 +26,10 @@ export class TudDatabase {
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('foreign_keys = ON')
     this.db.exec(migration)
+    const condominiumColumns = new Set((this.db.pragma('table_info(condominios)') as Array<{ name: string }>).map(column => column.name))
+    for (const column of ['gestor_nome', 'gestor_contato', 'ti_nome', 'ti_contato']) {
+      if (!condominiumColumns.has(column)) this.db.exec(`ALTER TABLE condominios ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`)
+    }
     if (currentVersion < 2) {
       const migrateCategories = this.db.transaction(() => {
         this.db.prepare('DELETE FROM categorias').run()
@@ -57,6 +61,20 @@ export class TudDatabase {
     }
     if (currentVersion < 6) this.db.pragma('user_version = 6')
     if (currentVersion < 7) this.db.pragma('user_version = 7')
+    if (currentVersion < 8) {
+      const hasLegacyContacts = Boolean(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='contatos'").get())
+      if (hasLegacyContacts) {
+        const migrateContacts = this.db.transaction(() => {
+          this.db.exec(`UPDATE condominios SET
+            gestor_nome=COALESCE(NULLIF(gestor_nome,''),(SELECT group_concat(nome,' / ') FROM contatos WHERE condominio_id=condominios.id AND tipo='Gestor'),''),
+            gestor_contato=COALESCE(NULLIF(gestor_contato,''),(SELECT group_concat(trim(telefone || CASE WHEN telefone!='' AND email!='' THEN ' · ' ELSE '' END || email),' / ') FROM contatos WHERE condominio_id=condominios.id AND tipo='Gestor'),''),
+            ti_nome=COALESCE(NULLIF(ti_nome,''),(SELECT group_concat(nome || CASE WHEN empresa!='' THEN ' · ' || empresa ELSE '' END,' / ') FROM contatos WHERE condominio_id=condominios.id AND tipo='Equipe de T.I.'),''),
+            ti_contato=COALESCE(NULLIF(ti_contato,''),(SELECT group_concat(trim(telefone || CASE WHEN telefone!='' AND email!='' THEN ' · ' ELSE '' END || email),' / ') FROM contatos WHERE condominio_id=condominios.id AND tipo='Equipe de T.I.'),'')`)
+          this.db.pragma('user_version = 8')
+        })
+        migrateContacts()
+      } else this.db.pragma('user_version = 8')
+    }
   }
 
   close() { if (this.db.open) this.db.close() }
@@ -73,15 +91,15 @@ export class TudDatabase {
     const nome = String(input.nome || '').trim()
     if (!nome) throw new Error('Informe o nome do condomínio.')
     try {
-      return Number(this.db.prepare(`INSERT INTO condominios(nome,nome_norm,endereco,contato,observacoes,criado_em) VALUES(?,?,?,?,?,?)`)
-        .run(nome, normalize(nome), input.endereco || '', input.contato || '', input.observacoes || '', now()).lastInsertRowid)
+      return Number(this.db.prepare(`INSERT INTO condominios(nome,nome_norm,endereco,contato,gestor_nome,gestor_contato,ti_nome,ti_contato,observacoes,criado_em) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+        .run(nome, normalize(nome), input.endereco || '', input.contato || '', input.gestor_nome || '', input.gestor_contato || '', input.ti_nome || '', input.ti_contato || '', input.observacoes || '', now()).lastInsertRowid)
     } catch { throw new Error('Já existe um condomínio com esse nome.') }
   }
 
   updateCondominio(id: number, input: Partial<Condominio>) {
     const nome = String(input.nome || '').trim()
     if (!nome) throw new Error('Informe o nome do condomínio.')
-    try { this.db.prepare(`UPDATE condominios SET nome=?,nome_norm=?,endereco=?,contato=?,observacoes=? WHERE id=?`).run(nome, normalize(nome), input.endereco || '', input.contato || '', input.observacoes || '', id) }
+    try { this.db.prepare(`UPDATE condominios SET nome=?,nome_norm=?,endereco=?,contato=?,gestor_nome=?,gestor_contato=?,ti_nome=?,ti_contato=?,observacoes=? WHERE id=?`).run(nome, normalize(nome), input.endereco || '', input.contato || '', input.gestor_nome || '', input.gestor_contato || '', input.ti_nome || '', input.ti_contato || '', input.observacoes || '', id) }
     catch { throw new Error('Já existe um condomínio com esse nome.') }
   }
 
@@ -235,31 +253,6 @@ export class TudDatabase {
   }
   markReminderNotified(id: number) { this.db.prepare('UPDATE lembretes SET notificado_em=? WHERE id=?').run(now(), id) }
 
-  listContacts(search = '', tipo: ContatoTipo | '' = ''): Contato[] {
-    const clauses: string[] = []
-    const params: unknown[] = []
-    if (tipo) { clauses.push('p.tipo=?'); params.push(tipo) }
-    const terms = normalize(search).split(/\s+/).filter(Boolean)
-    for (const term of terms) { clauses.push('p.busca_norm LIKE ?'); params.push(`%${term}%`) }
-    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
-    return this.db.prepare(`SELECT p.*,c.nome condominio_nome FROM contatos p
-      LEFT JOIN condominios c ON c.id=p.condominio_id ${where}
-      ORDER BY p.nome COLLATE NOCASE,p.id`).all(...params) as Contato[]
-  }
-  createContact(input: ContatoInput) {
-    const values = contactValues(input)
-    const stamp = now()
-    return Number(this.db.prepare(`INSERT INTO contatos(tipo,nome,busca_norm,empresa,telefone,email,condominio_id,observacoes,criado_em,atualizado_em)
-      VALUES(?,?,?,?,?,?,?,?,?,?)`).run(values.tipo, values.nome, values.busca, values.empresa, values.telefone, values.email, values.condominioId, values.observacoes, stamp, stamp).lastInsertRowid)
-  }
-  updateContact(id: number, input: ContatoInput) {
-    const values = contactValues(input)
-    const result = this.db.prepare(`UPDATE contatos SET tipo=?,nome=?,busca_norm=?,empresa=?,telefone=?,email=?,condominio_id=?,observacoes=?,atualizado_em=? WHERE id=?`)
-      .run(values.tipo, values.nome, values.busca, values.empresa, values.telefone, values.email, values.condominioId, values.observacoes, now(), id)
-    if (!result.changes) throw new Error('Contato não encontrado.')
-  }
-  removeContact(id: number) { this.db.prepare('DELETE FROM contatos WHERE id=?').run(id) }
-
   settings(): AppSettings {
     const rows = this.db.prepare('SELECT chave,valor FROM settings').all() as Array<{ chave: string; valor: string }>
     const stored = Object.fromEntries(rows.map(x => { try { return [x.chave, JSON.parse(x.valor)] } catch { return [x.chave, x.valor] } }))
@@ -303,16 +296,4 @@ function periodStart(period?: Periodo) {
   else date.setDate(date.getDate() - Number(period.replace('d', '')))
   date.setHours(0, 0, 0, 0)
   return date.toISOString()
-}
-
-function contactValues(input: ContatoInput) {
-  const nome = input.nome.trim()
-  if (!nome) throw new Error('Informe o nome do contato ou da equipe.')
-  const tipo = input.tipo
-  const empresa = input.empresa?.trim() || ''
-  const telefone = input.telefone?.trim() || ''
-  const email = input.email?.trim() || ''
-  const observacoes = input.observacoes?.trim() || ''
-  const condominioId = input.condominioId || null
-  return { tipo, nome, empresa, telefone, email, observacoes, condominioId, busca: normalize([nome, tipo, empresa, telefone, email, observacoes].join(' ')) }
 }

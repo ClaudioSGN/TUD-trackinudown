@@ -27,7 +27,7 @@ export function AttendancesPage({ condominios, categories, condominioId }: { con
     <section className="sticky-intro">
       <span className="eyebrow">{all ? 'Todos' : 'Condomínio'}</span>
       <h1 className="display sm">{all ? <><em>Todos</em> os atendimentos</> : italicFirst(condo?.nome || 'Condomínio')}</h1>
-      {condo && <div className="contact"><div>{condo.endereco || 'Endereço não informado'}</div><div>{condo.contato || 'Contato não informado'} {condo.contato && <button className="icon-button" style={{ display: 'inline-grid' }} onClick={() => navigator.clipboard.writeText(condo.contato)} aria-label="Copiar contato"><Copy size={15}/></button>}</div></div>}
+      {condo && <div className="condo-profile-info"><div className="contact"><div>{condo.endereco || 'Endereço não informado'}</div><div>{condo.contato || 'Contato geral não informado'} {condo.contato && <button className="icon-button inline-copy" onClick={() => navigator.clipboard.writeText(condo.contato)} aria-label="Copiar contato geral"><Copy size={15}/></button>}</div></div><div className="profile-people"><ProfileContact label="Gestor responsável" name={condo.gestor_nome} contact={condo.gestor_contato}/><ProfileContact label="Equipe de T.I." name={condo.ti_nome} contact={condo.ti_contato}/></div></div>}
       <p className="muted">{rows.length} atendimento{rows.length === 1 ? '' : 's'}{condo ? ` · ${condo.abertos} em aberto` : ''}</p>
       <div className="intro-actions"><button className="primary" onClick={() => openDrawer()}>Novo atendimento</button>{condo && <button className="secondary" onClick={() => openCondo(condo.id)} aria-label="Editar condomínio"><MoreHorizontal size={18}/></button>}</div>
     </section>
@@ -41,6 +41,7 @@ export function AttendancesPage({ condominios, categories, condominioId }: { con
 }
 
 function italicFirst(name: string) { const [first, ...rest] = name.split(' '); return <><em>{first}</em>{rest.length ? ` ${rest.join(' ')}` : ''}</> }
+function ProfileContact({ label, name, contact }: { label: string; name: string; contact: string }) { return <div className="profile-person"><span className="eyebrow">{label}</span><strong>{name || 'Não informado'}</strong>{contact && <span>{contact}<button className="icon-button inline-copy" onClick={() => navigator.clipboard.writeText(contact)} aria-label={`Copiar contato de ${label}`}><Copy size={14}/></button></span>}</div> }
 function Filter({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) { return <select className={`chip ${value ? 'active' : ''}`} value={value} onChange={e => onChange(e.target.value)} aria-label={label}><option value="">{label}</option>{options.map(option => <option key={option} value={option}>{option}</option>)}</select> }
 
 function AttendanceRow({ item, all, onOpen }: { item: Atendimento; all: boolean; onOpen: () => void }) {
