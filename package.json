@@ -1,6 +1,6 @@
 {
   "name": "tud-desktop",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "TUD — Tracking u Down",
   "repository": {
     "type": "git",
@@ -89,7 +89,7 @@
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": false,
+      "perMachine": true,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false,
