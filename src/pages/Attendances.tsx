@@ -5,16 +5,17 @@ import type { Anexo, Atendimento, AtendimentoAtualizacao, AtendimentoFilters, Co
 import { dateTime, mediaUrl, ticketId } from '../lib/format'
 import { useUi } from '../stores/ui'
 
-export function AttendancesPage({ condominios, categories, condominioId }: { condominios: Condominio[]; categories: string[]; condominioId?: number }) {
+export function AttendancesPage({ condominios, categories, condominioId, initialStatus }: { condominios: Condominio[]; categories: string[]; condominioId?: number; initialStatus?: Status }) {
   const condo = condominios.find(x => x.id === condominioId)
   const all = !condominioId
-  const [filters, setFilters] = useState<AtendimentoFilters>({ sort: 'id' })
+  const [filters, setFilters] = useState<AtendimentoFilters>({ sort: 'id', status: initialStatus || '' })
   const [detailId, setDetailId] = useState<number | null>(null)
   const [toast, setToast] = useState<{ id: number; title: string } | null>(null)
   const queryClient = useQueryClient()
   const { openDrawer, openCondo } = useUi()
   const query = { ...filters, condominioId }
   const { data: rows = [] } = useQuery({ queryKey: ['atendimentos', query], queryFn: () => window.tud.atendimentos.list(query) })
+  useEffect(() => setFilters(current => ({ ...current, status: initialStatus || '' })), [initialStatus])
   const invalidate = () => queryClient.invalidateQueries()
   const remove = async (item: Atendimento) => {
     await window.tud.atendimentos.remove(item.id)
