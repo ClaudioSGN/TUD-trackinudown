@@ -21,6 +21,7 @@ export interface Condominio {
 export interface Anexo {
   id: number
   atendimento_id: number
+  atualizacao_id: number | null
   caminho: string
   miniatura: string
   nome_original: string
@@ -72,6 +73,7 @@ export interface AtendimentoUpdateInput {
   text?: string
   status?: Status
   categoria?: string
+  hasAttachments?: boolean
 }
 
 export interface Lembrete {
@@ -167,8 +169,8 @@ export interface TudApi {
     undoRemove(id: number): Promise<void>
   }
   anexos: {
-    addFiles(id: number, files: File[]): Promise<Anexo[]>
-    addBuffer(id: number, bytes: Uint8Array, mime: string, name: string): Promise<Anexo>
+    addFiles(id: number, files: File[], updateId?: number): Promise<Anexo[]>
+    addBuffer(id: number, bytes: Uint8Array, mime: string, name: string, updateId?: number): Promise<Anexo>
     remove(id: number): Promise<void>
     reveal(path: string): Promise<void>
     copyToClipboard(path: string): Promise<void>

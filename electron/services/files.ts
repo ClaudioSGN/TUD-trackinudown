@@ -17,37 +17,41 @@ export class FileService {
     fs.mkdirSync(this.attachments, { recursive: true }); fs.mkdirSync(this.thumbnails, { recursive: true })
   }
 
-  addPaths(atendimentoId: number, paths: string[]) {
+  addPaths(atendimentoId: number, paths: string[], updateId?: number) {
     const added: Anexo[] = []
-    try { for (const file of paths) added.push(this.addPath(atendimentoId, file)); return added }
+    try { for (const file of paths) added.push(this.addPath(atendimentoId, file, updateId)); return added }
     catch (error) { added.forEach(attachment => this.remove(attachment.id)); throw error }
   }
 
-  addPath(atendimentoId: number, source: string): Anexo {
+  addPath(atendimentoId: number, source: string, updateId?: number): Anexo {
     const stat = fs.statSync(source); if (stat.size > 20 * 1024 * 1024) throw new Error('Cada imagem pode ter no máximo 20 MB.')
     const ext = path.extname(source).toLowerCase(); if (!allowed.has(ext)) throw new Error('Formato de imagem não suportado.')
     const folder = path.join(String(new Date().getFullYear()), String(new Date().getMonth() + 1).padStart(2, '0'))
     const name = `${crypto.randomUUID()}${ext === '.jpeg' ? '.jpg' : ext}`
     const destination = path.join(this.attachments, folder, name); fs.mkdirSync(path.dirname(destination), { recursive: true })
     const temp = `${destination}.tmp`; fs.copyFileSync(source, temp); fs.renameSync(temp, destination)
-    return this.insert(atendimentoId, destination, path.basename(source), stat.size)
+    return this.insert(atendimentoId, destination, path.basename(source), stat.size, updateId)
   }
 
-  addBuffer(atendimentoId: number, bytes: Uint8Array, mime: string, originalName: string): Anexo {
+  addBuffer(atendimentoId: number, bytes: Uint8Array, mime: string, originalName: string, updateId?: number): Anexo {
     if (bytes.byteLength > 20 * 1024 * 1024) throw new Error('Cada imagem pode ter no máximo 20 MB.')
     const extByMime: Record<string, string> = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/bmp': '.bmp', 'image/gif': '.gif' }
     const ext = extByMime[mime] || path.extname(originalName).toLowerCase(); if (!allowed.has(ext)) throw new Error('Formato de imagem não suportado.')
     const folder = path.join(String(new Date().getFullYear()), String(new Date().getMonth() + 1).padStart(2, '0'))
     const destination = path.join(this.attachments, folder, `${crypto.randomUUID()}${ext}`); fs.mkdirSync(path.dirname(destination), { recursive: true })
     const temp = `${destination}.tmp`; fs.writeFileSync(temp, bytes); fs.renameSync(temp, destination)
-    return this.insert(atendimentoId, destination, originalName || `imagem${ext}`, bytes.byteLength)
+    return this.insert(atendimentoId, destination, originalName || `imagem${ext}`, bytes.byteLength, updateId)
   }
 
-  private insert(atendimentoId: number, absolute: string, original: string, bytes: number): Anexo {
+  private insert(atendimentoId: number, absolute: string, original: string, bytes: number, updateId?: number): Anexo {
+    if (updateId) {
+      const update = this.database.db.prepare('SELECT 1 FROM atendimento_atualizacoes WHERE id=? AND atendimento_id=?').get(updateId, atendimentoId)
+      if (!update) { fs.rmSync(absolute, { force: true }); throw new Error('A atualização informada não pertence a este atendimento.') }
+    }
     const relative = path.relative(this.root, absolute).split(path.sep).join('/')
     const created = new Date().toISOString()
-    const id = Number(this.database.db.prepare(`INSERT INTO anexos(atendimento_id,caminho,miniatura,nome_original,bytes,criado_em) VALUES(?,?,?,?,?,?)`).run(atendimentoId, relative, relative, original, bytes, created).lastInsertRowid)
-    return { id, atendimento_id: atendimentoId, caminho: relative, miniatura: relative, nome_original: original, bytes, criado_em: created }
+    const id = Number(this.database.db.prepare(`INSERT INTO anexos(atendimento_id,atualizacao_id,caminho,miniatura,nome_original,bytes,criado_em) VALUES(?,?,?,?,?,?,?)`).run(atendimentoId, updateId || null, relative, relative, original, bytes, created).lastInsertRowid)
+    return { id, atendimento_id: atendimentoId, atualizacao_id: updateId || null, caminho: relative, miniatura: relative, nome_original: original, bytes, criado_em: created }
   }
 
   resolve(relative: string) {

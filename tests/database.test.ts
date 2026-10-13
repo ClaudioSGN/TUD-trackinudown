@@ -43,6 +43,21 @@ describe('TudDatabase', () => {
     expect(fs.existsSync(path.join(root, attachment.caminho))).toBe(true)
   })
 
+  it('vincula anexos à atualização e os apaga junto com ela', () => {
+    const condominioId = database.createCondominio({ nome: 'Parque Central' })
+    const atendimentoId = database.createAtendimento({ condominioId, titulo: 'Imagem do reparo' })
+    const updateId = database.addUpdate(atendimentoId, { hasAttachments: true })
+    const files = new FileService(root, database)
+    const attachment = files.addBuffer(atendimentoId, new Uint8Array([137, 80, 78, 71]), 'image/png', 'depois.png', updateId)
+    expect(database.getAtendimento(atendimentoId)?.anexos).toMatchObject([{ id: attachment.id, atualizacao_id: updateId, nome_original: 'depois.png' }])
+
+    const attachmentIds = database.removeUpdates(atendimentoId, [updateId])
+    expect(attachmentIds).toEqual([attachment.id])
+    attachmentIds.forEach(id => files.remove(id))
+    expect(database.getAtendimento(atendimentoId)?.anexos).toEqual([])
+    expect(fs.existsSync(path.join(root, attachment.caminho))).toBe(false)
+  })
+
   it('faz busca sem diferenciar acentos', () => {
     const id = database.createCondominio({ nome: 'Gaivota' })
     database.createAtendimento({ condominioId: id, titulo: 'Reunião com o síndico' })

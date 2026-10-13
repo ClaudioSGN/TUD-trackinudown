@@ -15,7 +15,7 @@ const api: TudApi = {
     remove: id => invoke('atendimentos:remove', id), undoRemove: id => invoke('atendimentos:undo', id)
   },
   anexos: {
-    addFiles: async (id, files) => {
+    addFiles: async (id, files, updateId) => {
       const paths: string[] = []
       const memoryFiles: Array<{ bytes: Uint8Array; mime: string; name: string }> = []
       for (const file of files) {
@@ -23,16 +23,16 @@ const api: TudApi = {
         if (filePath) paths.push(filePath)
         else memoryFiles.push({ bytes: new Uint8Array(await file.arrayBuffer()), mime: file.type, name: file.name || 'imagem-colada' })
       }
-      const added = paths.length ? await invoke('anexos:add-paths', id, paths) : []
+      const added = paths.length ? await invoke('anexos:add-paths', id, paths, updateId) : []
       try {
-        for (const file of memoryFiles) added.push(await invoke('anexos:add-buffer', id, file.bytes, file.mime, file.name))
+        for (const file of memoryFiles) added.push(await invoke('anexos:add-buffer', id, file.bytes, file.mime, file.name, updateId))
         return added
       } catch (error) {
         await Promise.allSettled(added.map((attachment: { id: number }) => invoke('anexos:remove', attachment.id)))
         throw error
       }
     },
-    addBuffer: (id, bytes, mime, name) => invoke('anexos:add-buffer', id, bytes, mime, name), remove: id => invoke('anexos:remove', id),
+    addBuffer: (id, bytes, mime, name, updateId) => invoke('anexos:add-buffer', id, bytes, mime, name, updateId), remove: id => invoke('anexos:remove', id),
     reveal: path => invoke('anexos:reveal', path), copyToClipboard: path => invoke('anexos:copy', path)
   },
   dashboard: { summary: period => invoke('dashboard:summary', period) },

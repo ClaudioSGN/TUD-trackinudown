@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpRight, Check, CirclePlus, Copy, Link2, MessageSquarePlus, MoreHorizontal, Paperclip, RefreshCw, Search, Send, Tag, Trash2, Unlink, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Check, CirclePlus, Copy, Link2, MessageSquarePlus, MoreHorizontal, Paperclip, RefreshCw, Search, Send, Tag, Trash2, Unlink, Upload, X } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useState } from 'react'
 import type { Anexo, Atendimento, AtendimentoAtualizacao, AtendimentoFilters, Condominio, Status } from '../types/domain'
@@ -58,13 +58,15 @@ function AttendanceDetail({ id, categories, onClose, onOpenRelated, onRemove, on
   const [updateCategory, setUpdateCategory] = useState('')
   const [updateError, setUpdateError] = useState('')
   const [sendingUpdate, setSendingUpdate] = useState(false)
+  const [updateFiles, setUpdateFiles] = useState<File[]>([])
+  const [updateDrag, setUpdateDrag] = useState(false)
   const [viewer, setViewer] = useState<number | null>(null)
   const { data: item } = useQuery({ queryKey: ['atendimento', id], queryFn: () => window.tud.atendimentos.get(id) })
   const { data: updates = [] } = useQuery({ queryKey: ['atendimento-updates', id], queryFn: () => window.tud.atendimentos.updates(id) })
   const { data: related = [] } = useQuery({ queryKey: ['atendimento-related', id], queryFn: () => window.tud.atendimentos.related(id) })
   const { data: candidates = [] } = useQuery({ queryKey: ['atendimentos', 'relation-candidates'], queryFn: () => window.tud.atendimentos.list({ limit: 1000 }) })
   useEffect(() => { const key = (event: KeyboardEvent) => { if (event.key === 'Escape' && viewer === null) onClose() }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key) }, [onClose, viewer])
-  useEffect(() => { setLinkId(''); setLinkError(''); setUpdateText(''); setUpdateError('') }, [id])
+  useEffect(() => { setLinkId(''); setLinkError(''); setUpdateText(''); setUpdateFiles([]); setUpdateError('') }, [id])
   useEffect(() => { if (item) { setUpdateStatus(item.status); setUpdateCategory(item.categoria) } }, [item?.status, item?.categoria])
   if (!item) return null
 
@@ -76,16 +78,31 @@ function AttendanceDetail({ id, categories, onClose, onOpenRelated, onRemove, on
   const firstCategoryChange = chronological.find(update => update.tipo === 'categoria')
   const initialStatus = (creation?.valor_anterior || firstStatusChange?.valor_anterior || item.status) as Status
   const initialCategory = creation?.valor_novo || firstCategoryChange?.valor_anterior || item.categoria
-  const activity = groupUpdates(chronological.filter(update => update.tipo !== 'criacao'))
+  const attachments = item.anexos || []
+  const creationAttachments = attachments.filter(attachment => !attachment.atualizacao_id)
+  const activity = groupUpdates(chronological.filter(update => update.tipo !== 'criacao')).map(group => ({ ...group, attachments: attachments.filter(attachment => attachment.atualizacao_id !== null && group.ids.includes(attachment.atualizacao_id)) }))
   const changed = updateStatus !== item.status || updateCategory !== item.categoria
-  const canSend = Boolean(updateText.trim() || changed)
+  const canSend = Boolean(updateText.trim() || changed || updateFiles.length)
+  const acceptUpdateFiles = (incoming: FileList | File[]) => {
+    const images = Array.from(incoming).filter(file => file.type.startsWith('image/'))
+    if (!images.length) { setUpdateError('Selecione ou cole somente arquivos de imagem.'); return }
+    setUpdateFiles(current => [...current, ...images].slice(0, 20)); setUpdateError('')
+  }
   const refresh = async () => { await queryClient.invalidateQueries(); onChange() }
   const changeStatus = async () => { await window.tud.atendimentos.setStatus(item.id, item.status === 'Concluído' ? 'Aberto' : 'Concluído'); await refresh() }
   const sendUpdate = async (event: FormEvent) => {
     event.preventDefault(); if (!canSend || sendingUpdate) return
     setSendingUpdate(true); setUpdateError('')
-    try { await window.tud.atendimentos.addUpdate(item.id, { text: updateText.trim(), status: updateStatus, categoria: updateCategory }); setUpdateText(''); await refresh() }
-    catch (error) { setUpdateError(error instanceof Error ? error.message : 'Não foi possível registrar a atualização.') }
+    let updateId = 0
+    try {
+      updateId = await window.tud.atendimentos.addUpdate(item.id, { text: updateText.trim(), status: updateStatus, categoria: updateCategory, hasAttachments: updateFiles.length > 0 })
+      setUpdateText('')
+      if (updateFiles.length) await window.tud.anexos.addFiles(item.id, updateFiles, updateId)
+      setUpdateFiles([]); await refresh()
+    } catch (error) {
+      if (updateId) { setUpdateText(''); await refresh(); setUpdateError('A atualização foi salva, mas não foi possível anexar as imagens. Elas continuam selecionadas para você tentar novamente.') }
+      else setUpdateError(error instanceof Error ? error.message : 'Não foi possível registrar a atualização.')
+    }
     finally { setSendingUpdate(false) }
   }
   const link = async () => {
@@ -105,26 +122,39 @@ function AttendanceDetail({ id, categories, onClose, onOpenRelated, onRemove, on
     <section className="detail-hero"><span className="eyebrow">Atendimento {ticketId(item.id)} · {item.condominio_nome}</span><h1 className="display md">{italicFirst(item.titulo)}</h1><div className="detail-badges"><span className="badge"><i className={`dot ${item.status === 'Concluído' ? 'done' : item.status === 'Em andamento' ? 'progress' : ''}`}/>{item.status}</span><span className="badge">{item.categoria}</span><span className="badge">Prioridade {item.prioridade.toLowerCase()}</span><span className="muted">{dateTime(item.data_atendimento)}</span></div></section>
     <div className="detail-grid"><main>
       <section className="activity-stream" aria-label="Atualizações do atendimento">
-        <article className="activity-entry creation-entry"><span className="activity-marker"><CirclePlus size={18}/></span><div className="activity-message"><header><div><span className="eyebrow">Mensagem inicial</span><h2>Criação do chamado</h2></div><time>{dateTime(creation?.criado_em || item.criado_em)}</time></header><p className="creation-description">{item.descricao || 'Nenhuma descrição informada.'}</p><dl className="creation-details"><div><dt>Título</dt><dd>{item.titulo}</dd></div><div><dt>Condomínio</dt><dd>{item.condominio_nome}</dd></div><div><dt>Categoria</dt><dd>{initialCategory}</dd></div><div><dt>Status</dt><dd>{initialStatus}</dd></div><div><dt>Prioridade</dt><dd>{item.prioridade}</dd></div><div><dt>Data e hora</dt><dd>{dateTime(item.data_atendimento)}</dd></div></dl><div className="creation-attachments"><span className="eyebrow">Anexos</span>{item.anexos?.length ? <div className="detail-thumbs">{item.anexos.map((attachment, index) => <button key={attachment.id} onClick={() => setViewer(index)}><img src={mediaUrl(attachment.miniatura)} alt={attachment.nome_original}/><span>{attachment.nome_original}</span></button>)}</div> : <p className="muted">Nenhuma imagem anexada.</p>}</div></div></article>
-        {activity.map(group => <article className="activity-entry" key={group.at}><span className="activity-marker"><MessageSquarePlus size={18}/></span><div className="activity-message"><header><h2>Atualização</h2><div className="activity-message-actions"><time>{dateTime(group.at)}</time><button className="icon-button update-delete" onClick={() => removeUpdate(group)} title="Excluir atualização" aria-label={`Excluir atualização de ${dateTime(group.at)}`}><Trash2 size={16}/></button></div></header>{group.notes.map(note => <p className="activity-note" key={note.id}>{note.texto}</p>)}{group.changes.length > 0 && <div className="activity-changes">{group.changes.map(change => <div key={change.id}><span>{change.tipo === 'status' ? <RefreshCw size={15}/> : <Tag size={15}/>} {change.tipo === 'status' ? 'Status' : 'Categoria'}</span><strong>{change.valor_anterior}</strong><ArrowUpRight size={14}/><strong>{change.valor_novo}</strong></div>)}</div>}</div></article>)}
+        <article className="activity-entry creation-entry"><span className="activity-marker"><CirclePlus size={18}/></span><div className="activity-message"><header><div><span className="eyebrow">Mensagem inicial</span><h2>Criação do chamado</h2></div><time>{dateTime(creation?.criado_em || item.criado_em)}</time></header><p className="creation-description">{item.descricao || 'Nenhuma descrição informada.'}</p><dl className="creation-details"><div><dt>Título</dt><dd>{item.titulo}</dd></div><div><dt>Condomínio</dt><dd>{item.condominio_nome}</dd></div><div><dt>Categoria</dt><dd>{initialCategory}</dd></div><div><dt>Status</dt><dd>{initialStatus}</dd></div><div><dt>Prioridade</dt><dd>{item.prioridade}</dd></div><div><dt>Data e hora</dt><dd>{dateTime(item.data_atendimento)}</dd></div></dl><div className="creation-attachments"><span className="eyebrow">Anexos</span>{creationAttachments.length ? <div className="detail-thumbs">{creationAttachments.map(attachment => <button key={attachment.id} onClick={() => setViewer(attachments.findIndex(current => current.id === attachment.id))}><img src={mediaUrl(attachment.miniatura)} alt={attachment.nome_original}/><span>{attachment.nome_original}</span></button>)}</div> : <p className="muted">Nenhuma imagem anexada.</p>}</div></div></article>
+        {activity.map(group => <article className="activity-entry" key={group.at}><span className="activity-marker"><MessageSquarePlus size={18}/></span><div className="activity-message"><header><h2>Atualização</h2><div className="activity-message-actions"><time>{dateTime(group.at)}</time><button className="icon-button update-delete" onClick={() => removeUpdate(group)} title="Excluir atualização" aria-label={`Excluir atualização de ${dateTime(group.at)}`}><Trash2 size={16}/></button></div></header>{group.notes.filter(note => note.texto).map(note => <p className="activity-note" key={note.id}>{note.texto}</p>)}{group.changes.length > 0 && <div className="activity-changes">{group.changes.map(change => <div key={change.id}><span>{change.tipo === 'status' ? <RefreshCw size={15}/> : <Tag size={15}/>} {change.tipo === 'status' ? 'Status' : 'Categoria'}</span><strong>{change.valor_anterior}</strong><ArrowUpRight size={14}/><strong>{change.valor_novo}</strong></div>)}</div>}{group.attachments.length > 0 && <div className="activity-attachments"><span className="eyebrow">Anexos</span><div className="detail-thumbs">{group.attachments.map(attachment => <button key={attachment.id} onClick={() => setViewer(attachments.findIndex(current => current.id === attachment.id))}><img src={mediaUrl(attachment.miniatura)} alt={attachment.nome_original}/><span>{attachment.nome_original}</span></button>)}</div></div>}</div></article>)}
       </section>
-      <article className="card detail-card update-card"><span className="eyebrow">Nova atualização</span><h2>Adicionar ao chamado</h2><form className="update-form" onSubmit={sendUpdate}><textarea value={updateText} maxLength={5000} onChange={event => { setUpdateText(event.target.value); setUpdateError('') }} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit() } }} placeholder="Escreva testes realizados, retornos, decisões ou próximos passos…" aria-label="Texto da nova atualização"/><div className="update-fields"><label><span>Categoria</span><select value={updateCategory} onChange={event => setUpdateCategory(event.target.value)}>{categoryOptions.map(category => <option key={category}>{category}</option>)}</select></label><label><span>Status</span><select value={updateStatus} onChange={event => setUpdateStatus(event.target.value as Status)}><option>Aberto</option><option>Em andamento</option><option>Concluído</option></select></label></div><div className="update-form-footer"><span>{updateText.length}/5000 · Ctrl+Enter para enviar</span><button className="primary" disabled={!canSend || sendingUpdate}><Send size={16}/>{sendingUpdate ? 'Enviando…' : 'Adicionar atualização'}</button></div>{updateError && <div className="error-text">{updateError}</div>}</form></article>
+      <article className="card detail-card update-card"><span className="eyebrow">Nova atualização</span><h2>Adicionar ao chamado</h2><form className="update-form" onSubmit={sendUpdate} onPaste={event => { const images = Array.from(event.clipboardData.files).filter(file => file.type.startsWith('image/')); if (images.length) { event.preventDefault(); acceptUpdateFiles(images) } }}><textarea value={updateText} maxLength={5000} onChange={event => { setUpdateText(event.target.value); setUpdateError('') }} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit() } }} placeholder="Escreva testes realizados, retornos, decisões ou próximos passos…" aria-label="Texto da nova atualização"/><div className="update-fields"><label><span>Categoria</span><select value={updateCategory} onChange={event => setUpdateCategory(event.target.value)}>{categoryOptions.map(category => <option key={category}>{category}</option>)}</select></label><label><span>Status</span><select value={updateStatus} onChange={event => setUpdateStatus(event.target.value as Status)}><option>Aberto</option><option>Em andamento</option><option>Concluído</option></select></label></div><label className={`update-dropzone ${updateDrag ? 'drag' : ''}`} onDragOver={event => { event.preventDefault(); setUpdateDrag(true) }} onDragLeave={() => setUpdateDrag(false)} onDrop={event => { event.preventDefault(); setUpdateDrag(false); acceptUpdateFiles(event.dataTransfer.files) }}><Upload size={18}/><span>{updateDrag ? 'Solte as imagens aqui' : 'Cole com Ctrl+V, arraste ou escolha imagens'}</span><input hidden type="file" accept="image/*" multiple onChange={event => { if (event.target.files) acceptUpdateFiles(event.target.files); event.target.value = '' }}/></label>{updateFiles.length > 0 && <div className="pending-attachments">{updateFiles.map((file, index) => <PendingAttachment key={`${file.name}-${file.size}-${file.lastModified}-${index}`} file={file} onRemove={() => setUpdateFiles(current => current.filter((_, currentIndex) => currentIndex !== index))}/>)}</div>}<div className="update-form-footer"><span>{updateText.length}/5000 · {updateFiles.length ? `${updateFiles.length} anexo${updateFiles.length === 1 ? '' : 's'} · ` : ''}Ctrl+Enter para enviar</span><button className="primary" disabled={!canSend || sendingUpdate}><Send size={16}/>{sendingUpdate ? 'Enviando…' : 'Adicionar atualização'}</button></div>{updateError && <div className="error-text">{updateError}</div>}</form></article>
     </main><aside className="card related-card"><span className="eyebrow">Atendimentos relacionados</span><h2>Conectar outro chamado</h2><p className="muted">Digite o ID para acompanhar retornos, reincidências ou etapas do mesmo problema.</p><div className="relation-picker"><input list={`relation-options-${item.id}`} value={linkId} onChange={event => { setLinkId(event.target.value); setLinkError('') }} placeholder="Ex.: TUD-0042" aria-label="ID do atendimento a vincular"/><datalist id={`relation-options-${item.id}`}>{available.map(candidate => <option key={candidate.id} value={ticketId(candidate.id)}>{candidate.condominio_nome} · {candidate.titulo}</option>)}</datalist><button className="primary" disabled={!linkId.trim()} onClick={link}><Link2 size={16}/> Vincular por ID</button>{linkError && <div className="error-text">{linkError}</div>}</div><div className="related-list">{related.map(current => <div className="related-item" key={current.id}><button onClick={() => onOpenRelated(current.id)}><i className={`dot ${current.status === 'Concluído' ? 'done' : current.status === 'Em andamento' ? 'progress' : ''}`}/><span><strong><span className="ticket-id">{ticketId(current.id)}</span> {current.titulo}</strong><small>{current.condominio_nome} · {dateTime(current.data_atendimento)}</small></span><ArrowUpRight size={16}/></button><button className="icon-button" onClick={() => unlink(current.id)} aria-label={`Desvincular ${ticketId(current.id)} ${current.titulo}`}><Unlink size={15}/></button></div>)}{related.length === 0 && <div className="relation-empty">Nenhum atendimento vinculado.</div>}</div></aside></div>
     <footer className="detail-footer"><button className="ghost danger" onClick={() => onRemove(item)}>Excluir atendimento</button></footer>
   </div>{viewer !== null && item.anexos && <Viewer attachments={item.anexos} index={viewer} setIndex={setViewer} onClose={() => setViewer(null)}/>}</div>
 }
 
-type UpdateGroup = { at: string; ids: number[]; notes: AtendimentoAtualizacao[]; changes: AtendimentoAtualizacao[] }
+type UpdateGroup = { at: string; ids: number[]; notes: AtendimentoAtualizacao[]; changes: AtendimentoAtualizacao[]; attachments: Anexo[] }
 
 function groupUpdates(updates: AtendimentoAtualizacao[]): UpdateGroup[] {
   const groups = new Map<string, UpdateGroup>()
   for (const update of updates) {
-    const group = groups.get(update.criado_em) || { at: update.criado_em, ids: [], notes: [], changes: [] }
+    const group = groups.get(update.criado_em) || { at: update.criado_em, ids: [], notes: [], changes: [], attachments: [] }
     group.ids.push(update.id)
     if (update.tipo === 'nota') group.notes.push(update); else group.changes.push(update)
     groups.set(update.criado_em, group)
   }
   return [...groups.values()]
+}
+
+function PendingAttachment({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const [source, setSource] = useState('')
+  useEffect(() => {
+    const url = URL.createObjectURL(file)
+    setSource(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+  return <div className="pending-attachment">
+    {source && <img src={source} alt={file.name || 'Imagem colada'}/>}<span title={file.name}>{file.name || 'Imagem colada'}</span>
+    <button type="button" className="icon-button" onClick={onRemove} aria-label={`Remover ${file.name || 'imagem'}`}><X size={14}/></button>
+  </div>
 }
 
 function Viewer({ attachments, index, setIndex, onClose }: { attachments: Anexo[]; index: number; setIndex: (index: number) => void; onClose: () => void }) {

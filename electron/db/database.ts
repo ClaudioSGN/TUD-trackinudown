@@ -30,6 +30,8 @@ export class TudDatabase {
     for (const column of ['gestor_nome', 'gestor_contato', 'ti_nome', 'ti_contato']) {
       if (!condominiumColumns.has(column)) this.db.exec(`ALTER TABLE condominios ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`)
     }
+    const attachmentColumns = new Set((this.db.pragma('table_info(anexos)') as Array<{ name: string }>).map(column => column.name))
+    if (!attachmentColumns.has('atualizacao_id')) this.db.exec('ALTER TABLE anexos ADD COLUMN atualizacao_id INTEGER REFERENCES atendimento_atualizacoes(id) ON DELETE SET NULL')
     if (currentVersion < 2) {
       const migrateCategories = this.db.transaction(() => {
         this.db.prepare('DELETE FROM categorias').run()
@@ -75,6 +77,7 @@ export class TudDatabase {
         migrateContacts()
       } else this.db.pragma('user_version = 8')
     }
+    if (currentVersion < 9) this.db.pragma('user_version = 9')
   }
 
   close() { if (this.db.open) this.db.close() }
@@ -184,11 +187,12 @@ export class TudDatabase {
     const categoria = input.categoria?.trim() || current.categoria
     const statusChanged = status !== current.status
     const categoryChanged = categoria !== current.categoria
-    if (!text && !statusChanged && !categoryChanged) throw new Error('Escreva uma atualização ou altere o status ou a categoria.')
+    if (!text && !statusChanged && !categoryChanged && !input.hasAttachments) throw new Error('Escreva uma atualização, anexe uma imagem ou altere o status ou a categoria.')
     const stamp = now()
     const add = this.db.transaction(() => {
       let updateId = 0
       if (text) updateId = Number(this.db.prepare(`INSERT INTO atendimento_atualizacoes(atendimento_id,tipo,texto,criado_em) VALUES(?,'nota',?,?)`).run(id, text, stamp).lastInsertRowid)
+      else if (input.hasAttachments) updateId = Number(this.db.prepare(`INSERT INTO atendimento_atualizacoes(atendimento_id,tipo,texto,criado_em) VALUES(?,'nota','',?)`).run(id, stamp).lastInsertRowid)
       if (statusChanged) { const result = this.recordUpdate(id, 'status', '', current.status, status, stamp); if (!updateId) updateId = result }
       if (categoryChanged) { const result = this.recordUpdate(id, 'categoria', '', current.categoria, categoria, stamp); if (!updateId) updateId = result }
       this.db.prepare('UPDATE atendimentos SET status=?,categoria=?,concluido_em=?,atualizado_em=? WHERE id=?').run(status, categoria, status === 'Concluído' ? current.concluido_em || stamp : null, stamp, id)
@@ -198,9 +202,11 @@ export class TudDatabase {
   }
   removeUpdates(id: number, updateIds: number[]) {
     const ids = [...new Set(updateIds)].filter(Number.isInteger)
-    if (!ids.length) return
+    if (!ids.length) return []
     const placeholders = ids.map(() => '?').join(',')
+    const attachments = this.db.prepare(`SELECT id FROM anexos WHERE atendimento_id=? AND atualizacao_id IN (${placeholders})`).all(id, ...ids) as Array<{ id: number }>
     this.db.prepare(`DELETE FROM atendimento_atualizacoes WHERE atendimento_id=? AND tipo!='criacao' AND id IN (${placeholders})`).run(id, ...ids)
+    return attachments.map(attachment => attachment.id)
   }
   private recordUpdate(id: number, type: 'status' | 'categoria', text: string, previous: string, next: string, stamp = now()) {
     return Number(this.db.prepare('INSERT INTO atendimento_atualizacoes(atendimento_id,tipo,texto,valor_anterior,valor_novo,criado_em) VALUES(?,?,?,?,?,?)').run(id, type, text, previous, next, stamp).lastInsertRowid)

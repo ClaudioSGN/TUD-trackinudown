@@ -22,6 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_atend_cond_data ON atendimentos(condominio_id, da
 CREATE INDEX IF NOT EXISTS idx_atend_status ON atendimentos(status);
 CREATE TABLE IF NOT EXISTS anexos (
   id INTEGER PRIMARY KEY, atendimento_id INTEGER NOT NULL REFERENCES atendimentos(id) ON DELETE CASCADE,
+  atualizacao_id INTEGER REFERENCES atendimento_atualizacoes(id) ON DELETE SET NULL,
   caminho TEXT NOT NULL, miniatura TEXT NOT NULL, nome_original TEXT NOT NULL DEFAULT '',
   largura INTEGER, altura INTEGER, bytes INTEGER NOT NULL DEFAULT 0, criado_em TEXT NOT NULL
 );

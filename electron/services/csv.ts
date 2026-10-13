@@ -1,4 +1,4 @@
-import type { AtendimentoAtualizacao, Condominio } from '../../src/types/domain'
+import type { Anexo, AtendimentoAtualizacao, Condominio } from '../../src/types/domain'
 import type { TudDatabase } from '../db/database'
 
 const ticketId = (id: number) => `TUD-${String(id).padStart(4, '0')}`
@@ -29,7 +29,7 @@ const groupUpdates = (updates: AtendimentoAtualizacao[]) => {
   return [...groups.entries()]
 }
 
-const updateHistory = (updates: AtendimentoAtualizacao[]) => groupUpdates(updates).map(([date, group]) => {
+const updateHistory = (updates: AtendimentoAtualizacao[], attachments: Anexo[]) => groupUpdates(updates).map(([date, group]) => {
   const details = group.flatMap(update => {
     if (update.tipo === 'criacao') return ['Criação do chamado']
     if (update.tipo === 'nota') return update.texto ? [`Nota: ${update.texto}`] : []
@@ -37,6 +37,9 @@ const updateHistory = (updates: AtendimentoAtualizacao[]) => groupUpdates(update
     if (update.tipo === 'categoria') return [`Categoria: ${update.valor_anterior || '—'} → ${update.valor_novo || '—'}`]
     return []
   })
+  const updateIds = new Set(group.map(update => update.id))
+  const attachedNames = attachments.filter(attachment => attachment.atualizacao_id !== null && updateIds.has(attachment.atualizacao_id)).map(attachment => attachment.nome_original)
+  if (attachedNames.length) details.push(`Anexos: ${attachedNames.join(', ')}`)
   return `[${formatDate(date)}] ${details.join(' | ')}`
 }).join('\n')
 
@@ -67,7 +70,7 @@ export function buildDetailedCsv(database: TudDatabase, condominioId?: number) {
       ticketId(row.id), row.condominio_nome, row.titulo, row.descricao,
       initialCategory, row.categoria, initialStatus, row.status, row.prioridade,
       formatDate(row.data_atendimento), formatDate(row.criado_em), formatDate(row.atualizado_em), formatDate(row.concluido_em),
-      additionalUpdates, updateHistory(updates),
+      additionalUpdates, updateHistory(updates, attachments),
       attachments.length, attachments.map(attachment => attachment.nome_original).join(' | '), related,
       condo?.endereco, condo?.contato, condo?.gestor_nome, condo?.gestor_contato,
       condo?.ti_nome, condo?.ti_contato, condo?.observacoes
