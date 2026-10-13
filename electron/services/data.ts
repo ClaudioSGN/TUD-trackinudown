@@ -2,8 +2,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { ZipArchive } from 'archiver'
 import { unzipSync } from 'fflate'
-import { dialog } from 'electron'
+import { app, dialog, shell } from 'electron'
 import type { TudDatabase } from '../db/database'
+import { buildDetailedCsv, detailedCsvFileName } from './csv'
 
 export async function createBackup(database: TudDatabase, root: string, requested?: string) {
   const backupDir = requested || path.join(root, 'backups'); fs.mkdirSync(backupDir, { recursive: true })
@@ -38,13 +39,12 @@ export async function restoreBackup(database: TudDatabase, root: string) {
   return true
 }
 
-const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
 export async function exportCsv(database: TudDatabase, condominioId?: number) {
-  const rows = database.listAtendimentos(condominioId ? { condominioId } : {})
-  const result = await dialog.showSaveDialog({ title: 'Exportar atendimentos', defaultPath: 'atendimentos.csv', filters: [{ name: 'CSV', extensions: ['csv'] }] })
+  const condominiumName = condominioId ? database.listCondominios(true).find(item => item.id === condominioId)?.nome : undefined
+  const defaultPath = path.join(app.getPath('downloads'), detailedCsvFileName(new Date(), condominiumName))
+  const result = await dialog.showSaveDialog({ title: 'Exportar relatório detalhado de atendimentos', defaultPath, filters: [{ name: 'Planilha CSV', extensions: ['csv'] }] })
   if (result.canceled || !result.filePath) return null
-  const header = ['Condomínio','Título','Descrição','Categoria','Status','Prioridade','Data']
-  const body = rows.map(x => [x.condominio_nome,x.titulo,x.descricao,x.categoria,x.status,x.prioridade,x.data_atendimento].map(escapeCsv).join(';'))
-  fs.writeFileSync(result.filePath, '\ufeff' + [header.map(escapeCsv).join(';'), ...body].join('\r\n'), 'utf8')
+  fs.writeFileSync(result.filePath, '\ufeff' + buildDetailedCsv(database, condominioId), 'utf8')
+  shell.showItemInFolder(result.filePath)
   return result.filePath
 }
