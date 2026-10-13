@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { clipboard, ClipboardItem, shell } from 'electron'
 import type { Anexo } from '../../src/types/domain'
 import type { TudDatabase } from '../db/database'
 
@@ -78,8 +77,12 @@ export class FileService {
     const rows = this.database.db.prepare('SELECT id FROM atendimentos WHERE excluido_em IS NOT NULL').all() as Array<{ id: number }>
     rows.forEach(item => this.purgeAttendance(item.id))
   }
-  reveal(relative: string) { shell.showItemInFolder(this.resolve(relative)) }
+  async reveal(relative: string) {
+    const { shell } = await import('electron')
+    shell.showItemInFolder(this.resolve(relative))
+  }
   async copy(relative: string) {
+    const { clipboard, ClipboardItem } = await import('electron')
     const absolute = this.resolve(relative); const ext = path.extname(absolute).toLowerCase()
     const mime = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : ext === '.bmp' ? 'image/bmp' : 'image/png'
     const bytes = fs.readFileSync(absolute)
