@@ -25,11 +25,9 @@ jobs:
         run: npm run typecheck
       - name: Executar testes
         run: npm test
-      - name: Compilar e publicar release
-        run: npm run build && npx electron-builder --win nsis --x64 --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Garantir arquivos da atualização
+      - name: Compilar instalador
+        run: npm run build && npx electron-builder --win nsis --x64 --publish never
+      - name: Publicar release e arquivos da atualização
         shell: pwsh
         run: |
           $version = node -p "require('./package.json').version"
@@ -38,6 +36,6 @@ jobs:
           $remoteBlockmap = "$remoteInstaller.blockmap"
           Copy-Item -LiteralPath $installer -Destination $remoteInstaller -Force
           Copy-Item -LiteralPath "$installer.blockmap" -Destination $remoteBlockmap -Force
-          gh release upload $env:GITHUB_REF_NAME $remoteInstaller $remoteBlockmap "release/latest.yml" --clobber
+          gh release create $env:GITHUB_REF_NAME $remoteInstaller $remoteBlockmap "release/latest.yml" --title "TUD $version" --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
