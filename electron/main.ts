@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, protocol, net, Tray, Menu, Notification, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, protocol, net, Tray, Menu, Notification, ipcMain } from 'electron'
 import electronUpdater from 'electron-updater'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import { TudDatabase } from './db/database'
 import { FileService } from './services/files'
 import { registerIpc } from './ipc'
-import { createBackup } from './services/data'
+import { createBackup, restoreBackup } from './services/data'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 let mainWindow: BrowserWindow | null = null
@@ -14,12 +14,18 @@ let database: TudDatabase | null = null
 let tray: Tray | null = null
 let allowQuit = false
 let dataRoot: string | null = null
+let pendingPortablePath = findPortableArgument(process.argv)
+let importingPortable = false
 const { autoUpdater } = electronUpdater
 protocol.registerSchemesAsPrivileged([{ scheme: 'tud-media', privileges: { secure: true, supportFetchAPI: true, standard: true } }])
 
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
-  app.on('second-instance', () => { if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus() } })
+  app.on('second-instance', (_event, argv) => {
+    if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus() }
+    const portablePath = findPortableArgument(argv)
+    if (portablePath) { pendingPortablePath = portablePath; void openPortableArchive(portablePath) }
+  })
   app.whenReady().then(start)
 }
 
@@ -46,6 +52,7 @@ async function start() {
   mainWindow.once('ready-to-show', () => { if (saved?.maximized) mainWindow?.maximize(); mainWindow?.show() })
   if (process.env.ELECTRON_RENDERER_URL) await mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   else await mainWindow.loadFile(path.join(dirname, '../renderer/index.html'))
+  if (pendingPortablePath) { const portablePath = pendingPortablePath; pendingPortablePath = null; setTimeout(() => void openPortableArchive(portablePath), 500) }
   configureAutoUpdates(root)
   mainWindow.on('close', event => { if (!database || !mainWindow) return; const b = mainWindow.getBounds(); database.setSettings({ windowBounds: { ...b, maximized: mainWindow.isMaximized() } }); if (!allowQuit && database.settings().closeBehavior === 'tray') { event.preventDefault(); mainWindow.hide() } })
   if (settings.globalShortcut) globalShortcut.register('CommandOrControl+Alt+T', () => { mainWindow?.show(); mainWindow?.focus(); mainWindow?.webContents.send('global-quick-add') })
@@ -67,6 +74,24 @@ async function start() {
   }
   notifyDueReminders()
   setInterval(notifyDueReminders, 30_000).unref()
+}
+
+function findPortableArgument(args: string[]) {
+  return args.find(argument => path.extname(argument).toLowerCase() === '.tud' && path.isAbsolute(argument) && fs.existsSync(argument)) || null
+}
+
+async function openPortableArchive(filePath: string) {
+  if (importingPortable) return
+  if (!database || !dataRoot) { pendingPortablePath = filePath; return }
+  importingPortable = true
+  try {
+    const restored = await restoreBackup(database, dataRoot, filePath)
+    if (restored) { allowQuit = true; app.relaunch(); app.exit(0) }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Não foi possível importar o arquivo TUD.'
+    dialog.showErrorBox('Falha ao importar arquivo TUD', message)
+    if (!database.db.open) { allowQuit = true; app.relaunch(); app.exit(1) }
+  } finally { importingPortable = false }
 }
 
 function configureAutoUpdates(root: string) {
@@ -103,7 +128,7 @@ function prepareDataDirectory() {
     }
   }
   const guide = path.join(root, 'LEIA-ME - Restaurar dados.txt')
-  if (!fs.existsSync(guide)) fs.writeFileSync(guide, 'DADOS DO TUD\r\n\r\nPara restaurar após formatar o computador, feche o TUD e copie esta pasta completa para a pasta Documentos do Windows, mantendo o nome "TUD Dados". Depois, instale ou abra o TUD novamente.\r\n\r\nNão altere os arquivos tud.db, anexos ou miniaturas separadamente.\r\n', 'utf8')
+  fs.writeFileSync(guide, 'DADOS DO TUD\r\n\r\nMÉTODO RECOMENDADO\r\nEm Preferências > Dados, clique em "Criar arquivo portátil". Copie o arquivo .tud para o outro computador, instale o TUD e abra o arquivo com dois cliques.\r\n\r\nMÉTODO MANUAL\r\nFeche o TUD e copie esta pasta completa para a pasta Documentos do Windows, mantendo o nome "TUD Dados". Depois, instale ou abra o TUD novamente.\r\n\r\nNão altere os arquivos tud.db ou anexos separadamente.\r\n', 'utf8')
   return root
 }
 

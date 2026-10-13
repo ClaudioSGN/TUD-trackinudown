@@ -1,6 +1,6 @@
 {
   "name": "tud-desktop",
-  "version": "3.2.4",
+  "version": "3.2.5",
   "description": "TUD — Tracking u Down",
   "repository": {
     "type": "git",
@@ -72,6 +72,15 @@
       {
         "from": "resources/icon.ico",
         "to": "icon.ico"
+      }
+    ],
+    "fileAssociations": [
+      {
+        "ext": "tud",
+        "name": "Arquivo portátil do TUD",
+        "description": "Backup portátil de chamados e anexos do TUD",
+        "icon": "resources/icon.ico",
+        "role": "Editor"
       }
     ],
     "win": {

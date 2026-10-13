@@ -181,7 +181,7 @@ export interface TudApi {
     remove(id: number): Promise<void>
   }
   quickAdd: { create(input: { condominioId: number; titulo: string }): Promise<number> }
-  backup: { create(folder?: string): Promise<string | null>; restore(): Promise<boolean> }
+  backup: { createPortable(): Promise<string | null>; restore(): Promise<boolean> }
   export: { csv(condominioId?: number): Promise<string | null> }
   settings: { get(): Promise<AppSettings>; set(patch: Partial<AppSettings>): Promise<AppSettings> }
   app: {

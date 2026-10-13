@@ -38,7 +38,7 @@ const api: TudApi = {
   dashboard: { summary: period => invoke('dashboard:summary', period) },
   lembretes: { list: includeCompleted => invoke('lembretes:list', includeCompleted), create: input => invoke('lembretes:create', input), setDone: (id, done) => invoke('lembretes:done', id, done), remove: id => invoke('lembretes:remove', id) },
   quickAdd: { create: input => invoke('quick:create', input) },
-  backup: { create: folder => invoke('backup:create', folder), restore: () => invoke('backup:restore') },
+  backup: { createPortable: () => invoke('backup:create-portable'), restore: () => invoke('backup:restore') },
   export: { csv: condominioId => invoke('export:csv', condominioId) },
   settings: { get: () => invoke('settings:get'), set: patch => invoke('settings:set', patch) },
   app: {

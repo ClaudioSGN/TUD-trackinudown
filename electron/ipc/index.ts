@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { z } from 'zod'
 import type { TudDatabase } from '../db/database'
 import type { FileService } from '../services/files'
-import { createBackup, exportCsv, restoreBackup } from '../services/data'
+import { createPortableBackup, exportCsv, restoreBackup } from '../services/data'
 
 const id = z.number().int().positive()
 const condo = z.object({ nome: z.string().min(1).max(120), endereco: z.string().optional(), contato: z.string().optional(), gestor_nome: z.string().max(160).optional(), gestor_contato: z.string().max(240).optional(), ti_nome: z.string().max(160).optional(), ti_contato: z.string().max(240).optional(), observacoes: z.string().optional() })
@@ -43,8 +43,11 @@ export function registerIpc(database: TudDatabase, files: FileService, root: str
   handle('lembretes:remove', (rawId: unknown) => database.removeReminder(id.parse(rawId)))
   handle('settings:get', () => database.settings())
   handle('settings:set', (patch: any) => database.setSettings(patch))
-  handle('backup:create', (folder?: string) => createBackup(database, root, folder))
-  handle('backup:restore', async () => { const restored = await restoreBackup(database, root); if (restored) { app.relaunch(); app.exit(0) } return restored })
+  handle('backup:create-portable', () => createPortableBackup(database, root))
+  handle('backup:restore', async () => {
+    try { const restored = await restoreBackup(database, root); if (restored) { app.relaunch(); app.exit(0) } return restored }
+    catch (error) { if (!database.db.open) { app.relaunch(); app.exit(1) } throw error }
+  })
   handle('export:csv', (condominioId?: number) => exportCsv(database, condominioId))
   handle('app:version', () => app.getVersion())
   handle('app:data-folder', () => shell.openPath(root))
