@@ -1,6 +1,6 @@
 {
   "name": "tud-desktop",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "TUD — Tracking u Down",
   "repository": {
     "type": "git",
@@ -38,6 +38,7 @@
     "react-dom": "19.3.0",
     "react-hook-form": "latest",
     "react-router-dom": "latest",
+    "sharp": "0.35.5",
     "zod": "latest",
     "zustand": "latest"
   },
@@ -53,7 +54,6 @@
     "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "png-to-ico": "latest",
-    "sharp": "latest",
     "tailwindcss": "latest",
     "typescript": "latest",
     "vite": "7.3.7",

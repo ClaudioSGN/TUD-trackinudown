@@ -2,7 +2,6 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { gzipSync } from 'node:zlib'
-import sharp from 'sharp'
 import { WEB_SNAPSHOT_VERSION, type WebAttachment, type WebSnapshot } from '../../shared/web-snapshot'
 import type { Anexo, AppSettings, Atendimento, AtendimentoAtualizacao, Condominio } from '../../src/types/domain'
 import type { TudDatabase } from '../db/database'
@@ -17,6 +16,18 @@ export interface WebSyncResult {
 }
 
 type PreparedAttachment = { attachment: WebAttachment; bytes: Buffer }
+
+let sharpModule: Promise<typeof import('sharp')> | null = null
+
+async function imageProcessor() {
+  try {
+    sharpModule ??= import('sharp')
+    return (await sharpModule).default
+  } catch {
+    sharpModule = null
+    throw new Error('O componente de imagens da sincronização online não está disponível. Atualize ou reinstale o TUD.')
+  }
+}
 
 function endpoint(base: string, route: string) {
   const url = new URL(base.trim())
@@ -48,6 +59,7 @@ async function webImage(root: string, attachment: Anexo): Promise<PreparedAttach
   const safeRoot = `${path.resolve(root)}${path.sep}`
   if (!source.startsWith(safeRoot) || !fs.existsSync(source)) throw new Error(`Anexo não encontrado: ${attachment.nome_original}`)
 
+  const sharp = await imageProcessor()
   let bytes = await sharp(source).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer()
   if (bytes.byteLength > MAX_UPLOAD_BYTES) bytes = await sharp(source).rotate().resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true }).webp({ quality: 62 }).toBuffer()
   if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new Error(`O anexo ${attachment.nome_original} ficou grande demais para a versão web.`)
