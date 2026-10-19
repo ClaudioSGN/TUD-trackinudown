@@ -10,7 +10,9 @@ const defaults: AppSettings = {
   animation: 'full', backgroundEffects: true, splash: true, particles: true,
   density: 'comfortable', categories: defaultCategories,
   startWithWindows: false, tray: false, closeBehavior: 'quit', globalShortcut: true,
-  autoBackup: false, backupFolder: '', onboardingSeen: false, lastRoute: 'dashboard'
+  autoBackup: false, backupFolder: '',
+  webSyncEnabled: false, webSyncUrl: '', webSyncToken: '', webSyncLastAt: '', webSyncLastError: '',
+  onboardingSeen: false, lastRoute: 'dashboard'
 }
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('pt-BR')

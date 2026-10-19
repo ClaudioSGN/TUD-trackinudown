@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { TudDatabase } from '../db/database'
 import type { FileService } from '../services/files'
 import { createPortableBackup, exportCsv, restoreBackup } from '../services/data'
+import type { WebSyncService } from '../services/web-sync'
 
 const id = z.number().int().positive()
 const condo = z.object({ nome: z.string().min(1).max(120), endereco: z.string().optional(), contato: z.string().optional(), gestor_nome: z.string().max(160).optional(), gestor_contato: z.string().max(240).optional(), ti_nome: z.string().max(160).optional(), ti_contato: z.string().max(240).optional(), observacoes: z.string().optional() })
@@ -10,7 +11,7 @@ const attendance = z.object({ condominioId: id, titulo: z.string().min(1).max(20
 const attendanceUpdate = z.object({ text: z.string().trim().max(5000).optional(), categoria: z.string().trim().min(1).max(120).optional(), status: z.enum(['Aberto','Em andamento','Concluído']).optional(), hasAttachments: z.boolean().optional() })
 const reminder = z.object({ titulo: z.string().trim().min(1).max(200), observacoes: z.string().max(2000).optional(), lembreteEm: z.string().datetime(), atendimentoId: id.optional() })
 
-export function registerIpc(database: TudDatabase, files: FileService, root: string) {
+export function registerIpc(database: TudDatabase, files: FileService, root: string, webSync: WebSyncService) {
   const handle = (channel: string, fn: (...args: any[]) => any) => ipcMain.handle(channel, async (_event, ...args) => fn(...args))
   handle('condominios:list', (all?: boolean) => database.listCondominios(Boolean(all)))
   handle('condominios:create', (input: unknown) => database.createCondominio(condo.parse(input)))
@@ -52,6 +53,7 @@ export function registerIpc(database: TudDatabase, files: FileService, root: str
     catch (error) { if (!database.db.open) { app.relaunch(); app.exit(1) } throw error }
   })
   handle('export:csv', (condominioId?: number) => exportCsv(database, condominioId))
+  handle('web-sync:run', () => webSync.run())
   handle('app:version', () => app.getVersion())
   handle('app:data-folder', () => shell.openPath(root))
   ipcMain.handle('app:set-theme', (event, rawTheme: unknown) => {

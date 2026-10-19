@@ -140,6 +140,11 @@ export interface AppSettings {
   globalShortcut: boolean
   autoBackup: boolean
   backupFolder: string
+  webSyncEnabled: boolean
+  webSyncUrl: string
+  webSyncToken: string
+  webSyncLastAt: string
+  webSyncLastError: string
   onboardingSeen: boolean
   lastRoute: string
   windowBounds?: { x?: number; y?: number; width: number; height: number; maximized?: boolean }
@@ -185,6 +190,7 @@ export interface TudApi {
   quickAdd: { create(input: { condominioId: number; titulo: string }): Promise<number> }
   backup: { createPortable(): Promise<string | null>; restore(): Promise<boolean> }
   export: { csv(condominioId?: number): Promise<string | null> }
+  webSync: { run(): Promise<{ syncedAt: string; tickets: number; attachments: number; uploadedAttachments: number }> }
   settings: { get(): Promise<AppSettings>; set(patch: Partial<AppSettings>): Promise<AppSettings> }
   app: {
     version(): Promise<string>

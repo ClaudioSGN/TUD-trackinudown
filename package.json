@@ -1,6 +1,6 @@
 {
   "name": "tud-desktop",
-  "version": "3.2.7",
+  "version": "3.3.0",
   "description": "TUD — Tracking u Down",
   "repository": {
     "type": "git",
@@ -17,6 +17,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
     "dist": "npm run build && electron-builder --win nsis --x64",
+    "web:build": "npm --prefix web run build",
+    "web:typecheck": "npm --prefix web run typecheck",
     "release": "npm run typecheck && npm test && npm run build && electron-builder --win nsis --x64 --publish always",
     "pack": "npm run build && electron-builder --win dir --x64"
   },

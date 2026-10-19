@@ -7,6 +7,7 @@ import { TudDatabase } from './db/database'
 import { FileService } from './services/files'
 import { registerIpc } from './ipc'
 import { createBackup, restoreBackup } from './services/data'
+import { WebSyncService, webSyncConfigured } from './services/web-sync'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 let mainWindow: BrowserWindow | null = null
@@ -32,7 +33,8 @@ else {
 async function start() {
   app.setAppUserModelId('com.pessoal.tud')
   const root = prepareDataDirectory(); dataRoot = root
-  database = new TudDatabase(root); const files = new FileService(root, database); files.purgePending(); registerIpc(database, files, root)
+  database = new TudDatabase(root); const files = new FileService(root, database); files.purgePending()
+  const webSync = new WebSyncService(root, database, app.getVersion()); registerIpc(database, files, root, webSync)
   const settings = database.settings()
   const dark = settings.theme === 'dark'
   protocol.handle('tud-media', request => {
@@ -54,6 +56,12 @@ async function start() {
   else await mainWindow.loadFile(path.join(dirname, '../renderer/index.html'))
   if (pendingPortablePath) { const portablePath = pendingPortablePath; pendingPortablePath = null; setTimeout(() => void openPortableArchive(portablePath), 500) }
   configureAutoUpdates(root)
+  const syncOnline = () => {
+    if (!database || !webSyncConfigured(database.settings())) return
+    void webSync.run().catch(error => console.error('Falha na sincronização online:', error))
+  }
+  setTimeout(syncOnline, 12_000)
+  setInterval(syncOnline, 10 * 60 * 1000).unref()
   mainWindow.on('close', event => { if (!database || !mainWindow) return; const b = mainWindow.getBounds(); database.setSettings({ windowBounds: { ...b, maximized: mainWindow.isMaximized() } }); if (!allowQuit && database.settings().closeBehavior === 'tray') { event.preventDefault(); mainWindow.hide() } })
   if (settings.globalShortcut) globalShortcut.register('CommandOrControl+Alt+T', () => { mainWindow?.show(); mainWindow?.focus(); mainWindow?.webContents.send('global-quick-add') })
   app.setLoginItemSettings({ openAtLogin: settings.startWithWindows })

@@ -40,6 +40,7 @@ const api: TudApi = {
   quickAdd: { create: input => invoke('quick:create', input) },
   backup: { createPortable: () => invoke('backup:create-portable'), restore: () => invoke('backup:restore') },
   export: { csv: condominioId => invoke('export:csv', condominioId) },
+  webSync: { run: () => invoke('web-sync:run') },
   settings: { get: () => invoke('settings:get'), set: patch => invoke('settings:set', patch) },
   app: {
     version: () => invoke('app:version'), openDataFolder: () => invoke('app:data-folder'), setTheme: theme => invoke('app:set-theme', theme), checkForUpdates: () => invoke('app:check-updates'), installUpdate: () => invoke('app:install-update'),

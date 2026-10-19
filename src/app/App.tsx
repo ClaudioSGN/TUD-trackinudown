@@ -11,7 +11,7 @@ import { UpdateBanner } from '../components/UpdateBanner'
 import { useUi } from '../stores/ui'
 import type { AppSettings } from '../types/domain'
 
-const fallback:AppSettings={theme:'light',animation:'full',backgroundEffects:true,splash:true,particles:true,density:'comfortable',categories:['Suporte remoto','Elétrica','Infraestrutura','Visita'],startWithWindows:false,tray:false,closeBehavior:'quit',globalShortcut:true,autoBackup:false,backupFolder:'',onboardingSeen:false,lastRoute:'dashboard'}
+const fallback:AppSettings={theme:'light',animation:'full',backgroundEffects:true,splash:true,particles:true,density:'comfortable',categories:['Suporte remoto','Elétrica','Infraestrutura','Visita'],startWithWindows:false,tray:false,closeBehavior:'quit',globalShortcut:true,autoBackup:false,backupFolder:'',webSyncEnabled:false,webSyncUrl:'',webSyncToken:'',webSyncLastAt:'',webSyncLastError:'',onboardingSeen:false,lastRoute:'dashboard'}
 
 export function App(){
  const ui=useUi();const [shortcuts,setShortcuts]=useState(false);const {data:condominios=[]}=useQuery({queryKey:['condominios'],queryFn:()=>window.tud.condominios.list()});const {data:settings=fallback}=useQuery({queryKey:['settings'],queryFn:()=>window.tud.settings.get()});
