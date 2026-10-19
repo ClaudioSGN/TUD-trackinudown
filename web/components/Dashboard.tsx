@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowUpRight, Building2, CheckCircle2, ChevronRight, CircleDot, Clock3, Eye, FileImage, Link2, LogOut, Search, ShieldCheck, Tag, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { WebAttachment, WebSnapshot, WebTicket, WebTicketUpdate } from '../../shared/web-snapshot'
+import { ThemeToggle } from './ThemeToggle'
 
 const ticketId = (id: number) => `TUD-${String(id).padStart(4, '0')}`
 const formatDate = (value: string) => new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(value))
@@ -30,6 +31,7 @@ export function Dashboard({ snapshot }: { snapshot: WebSnapshot | null }) {
       <div className="readonly-pill"><Eye size={15}/><span>Somente leitura</span></div>
       <nav><a href="#overview" className="active"><CircleDot size={17}/> Visão geral</a><a href="#tickets"><Clock3 size={17}/> Atendimentos</a></nav>
       <div className="sync-info"><ShieldCheck size={18}/><span>Sincronizado em<strong>{formatDate(snapshot.generatedAt)}</strong></span></div>
+      <ThemeToggle/>
       <form action="/api/logout" method="post"><button className="logout"><LogOut size={16}/> Sair</button></form>
     </aside>
     <main className="viewer-main">
@@ -40,6 +42,14 @@ export function Dashboard({ snapshot }: { snapshot: WebSnapshot | null }) {
         <Metric label="Em andamento" value={snapshot.summary.inProgress} note="em execução" tone="blue"/>
         <Metric label="Concluídos" value={`${snapshot.summary.completionRate}%`} note={`${snapshot.summary.completed} finalizados`} tone="green"/>
       </section>
+      <StatusChart
+        total={snapshot.summary.total}
+        open={snapshot.summary.open}
+        inProgress={snapshot.summary.inProgress}
+        completed={snapshot.summary.completed}
+        active={status}
+        onChange={setStatus}
+      />
       <section id="tickets" className="ticket-section">
         <div className="section-heading"><div><span className="eyebrow">Registro completo</span><h2>Atendimentos</h2></div><span>{filtered.length} de {snapshot.tickets.length}</span></div>
         <div className="filters"><label className="search-box"><Search size={17}/><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar por ID, título, descrição ou condomínio"/></label><select value={status} onChange={event => setStatus(event.target.value)}><option value="">Todos os status</option><option>Aberto</option><option>Em andamento</option><option>Concluído</option></select><select value={category} onChange={event => setCategory(event.target.value)}><option value="">Todas as categorias</option>{categories.map(item => <option key={item}>{item}</option>)}</select><select value={condominium} onChange={event => setCondominium(event.target.value)}><option value="">Todos os condomínios</option>{condominiums.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></div>
@@ -58,8 +68,28 @@ function Status({ value }: { value: WebTicket['status'] }) {
   return <span className={`status ${value === 'Concluído' ? 'done' : value === 'Em andamento' ? 'progress' : 'open'}`}><i/>{value}</span>
 }
 
+function StatusChart({ total, open, inProgress, completed, active, onChange }: { total: number; open: number; inProgress: number; completed: number; active: string; onChange: (value: string) => void }) {
+  const items = [
+    { label: 'Aberto', value: open, tone: 'open' },
+    { label: 'Em andamento', value: inProgress, tone: 'progress' },
+    { label: 'Concluído', value: completed, tone: 'done' }
+  ]
+  return <section className="status-chart" aria-labelledby="status-chart-title">
+    <header><div><span className="eyebrow">Panorama</span><h2 id="status-chart-title">Distribuição por status</h2><p>Clique em uma faixa para filtrar os atendimentos.</p></div><strong>{total}<small> total</small></strong></header>
+    <div className="chart-bars">{items.map(item => {
+      const percentage = total ? Math.round((item.value / total) * 100) : 0
+      const selected = active === item.label
+      return <button type="button" key={item.label} className={`chart-row ${item.tone}${selected ? ' selected' : ''}`} aria-pressed={selected} onClick={() => onChange(selected ? '' : item.label)}>
+        <span className="chart-label"><i/>{item.label}</span>
+        <span className="chart-track" aria-hidden="true"><i style={{ width: `${percentage}%` }}/></span>
+        <strong>{item.value}<small>{percentage}%</small></strong>
+      </button>
+    })}</div>
+  </section>
+}
+
 function EmptySync() {
-  return <main className="empty-sync"><div className="brand-mark">tud.</div><CloudOff/><span className="eyebrow">Painel conectado</span><h1>Aguardando a primeira sincronização.</h1><p>No aplicativo TUD, abra <strong>Preferências → Visualização online</strong> e clique em <strong>Sincronizar agora</strong>.</p><form action="/api/logout" method="post"><button>Sair</button></form></main>
+  return <main className="empty-sync"><div className="brand-mark">tud.</div><ThemeToggle compact className="empty-theme-toggle"/><CloudOff/><span className="eyebrow">Painel conectado</span><h1>Aguardando a primeira sincronização.</h1><p>No aplicativo TUD, abra <strong>Preferências → Visualização online</strong> e clique em <strong>Sincronizar agora</strong>.</p><form action="/api/logout" method="post"><button>Sair</button></form></main>
 }
 
 function CloudOff() { return <div className="empty-symbol"><ArrowUpRight size={28}/></div> }
@@ -85,7 +115,7 @@ function TicketDetail({ ticket, snapshot, onClose, onSelect }: { ticket: WebTick
   const creationAttachments = ticket.attachments.filter(attachment => attachment.updateId === null)
   const condominium = snapshot.condominiums.find(item => item.id === ticket.condominiumId)
   return <div className="detail-overlay" role="dialog" aria-modal="true" aria-label={`Atendimento ${ticketId(ticket.id)}`}>
-    <header className="detail-top"><button onClick={onClose}><ArrowLeft size={17}/> Voltar ao painel</button><div><span className="readonly-pill"><Eye size={14}/> Somente leitura</span><button className="close-detail" onClick={onClose} aria-label="Fechar"><X size={20}/></button></div></header>
+    <header className="detail-top"><button onClick={onClose}><ArrowLeft size={17}/> Voltar ao painel</button><div><ThemeToggle compact/><span className="readonly-pill"><Eye size={14}/> Somente leitura</span><button className="close-detail" onClick={onClose} aria-label="Fechar"><X size={20}/></button></div></header>
     <main className="detail-content">
       <section className="detail-title"><span className="eyebrow">Atendimento {ticketId(ticket.id)} · {ticket.condominiumName}</span><h1>{ticket.title}</h1><div className="detail-meta"><Status value={ticket.status}/><span className="plain-pill">{ticket.category}</span><span className="plain-pill">Prioridade {ticket.priority.toLowerCase()}</span><time>{formatDate(ticket.serviceAt)}</time></div></section>
       <div className="detail-layout"><div className="timeline"><TimelineCard title="Criação do chamado" date={creation?.createdAt || ticket.createdAt} marker="create"><p>{ticket.description || 'Nenhuma descrição informada.'}</p><dl className="ticket-facts"><div><dt>Título</dt><dd>{ticket.title}</dd></div><div><dt>Condomínio</dt><dd>{ticket.condominiumName}</dd></div><div><dt>Categoria inicial</dt><dd>{creation?.nextValue || ticket.category}</dd></div><div><dt>Status inicial</dt><dd>{creation?.previousValue || ticket.status}</dd></div><div><dt>Prioridade</dt><dd>{ticket.priority}</dd></div><div><dt>Data e hora</dt><dd>{formatDate(ticket.serviceAt)}</dd></div></dl><Attachments items={creationAttachments} onOpen={setMedia}/></TimelineCard>

@@ -1,7 +1,9 @@
 import { Eye, LockKeyhole } from 'lucide-react'
+import { ThemeToggle } from './ThemeToggle'
 
 export function Login({ invalid }: { invalid: boolean }) {
   return <main className="login-shell">
+    <ThemeToggle compact className="login-theme-toggle"/>
     <section className="login-card">
       <div className="brand-mark">tud.</div>
       <div className="login-icon"><Eye size={24}/></div>
