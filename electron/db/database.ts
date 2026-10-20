@@ -190,14 +190,22 @@ export class TudDatabase {
     const statusChanged = status !== current.status
     const categoryChanged = categoria !== current.categoria
     if (!text && !statusChanged && !categoryChanged && !input.hasAttachments) throw new Error('Escreva uma atualização, anexe uma imagem ou altere o status ou a categoria.')
-    const stamp = now()
+    const savedAt = now()
+    const requestedStamp = input.createdAt || savedAt
+    const parsedStamp = new Date(requestedStamp)
+    if (Number.isNaN(parsedStamp.getTime())) throw new Error('Informe uma data e hora válidas para a atualização.')
+    let stamp = parsedStamp.toISOString()
+    while (this.db.prepare('SELECT 1 FROM atendimento_atualizacoes WHERE atendimento_id=? AND criado_em=? LIMIT 1').get(id, stamp)) {
+      parsedStamp.setMilliseconds(parsedStamp.getMilliseconds() + 1)
+      stamp = parsedStamp.toISOString()
+    }
     const add = this.db.transaction(() => {
       let updateId = 0
       if (text) updateId = Number(this.db.prepare(`INSERT INTO atendimento_atualizacoes(atendimento_id,tipo,texto,criado_em) VALUES(?,'nota',?,?)`).run(id, text, stamp).lastInsertRowid)
       else if (input.hasAttachments) updateId = Number(this.db.prepare(`INSERT INTO atendimento_atualizacoes(atendimento_id,tipo,texto,criado_em) VALUES(?,'nota','',?)`).run(id, stamp).lastInsertRowid)
       if (statusChanged) { const result = this.recordUpdate(id, 'status', '', current.status, status, stamp); if (!updateId) updateId = result }
       if (categoryChanged) { const result = this.recordUpdate(id, 'categoria', '', current.categoria, categoria, stamp); if (!updateId) updateId = result }
-      this.db.prepare('UPDATE atendimentos SET status=?,categoria=?,concluido_em=?,atualizado_em=? WHERE id=?').run(status, categoria, status === 'Concluído' ? current.concluido_em || stamp : null, stamp, id)
+      this.db.prepare('UPDATE atendimentos SET status=?,categoria=?,concluido_em=?,atualizado_em=? WHERE id=?').run(status, categoria, status === 'Concluído' ? current.concluido_em || stamp : null, savedAt, id)
       return updateId
     })
     return add()

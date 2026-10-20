@@ -111,6 +111,31 @@ describe('TudDatabase', () => {
     expect(database.getAtendimento(id)).toMatchObject({ status: 'Em andamento', categoria: 'Visita' })
   })
 
+  it('usa a data escolhida no texto e nas alterações da atualização', () => {
+    const condominioId = database.createCondominio({ nome: 'Vila Verde' })
+    const id = database.createAtendimento({ condominioId, titulo: 'Controle de acesso' })
+    const createdAt = '2026-06-12T17:45:00.000Z'
+
+    database.addUpdate(id, { text: 'Visita concluída.', status: 'Concluído', categoria: 'Visita', createdAt })
+
+    const updates = database.listUpdates(id).filter(update => update.tipo !== 'criacao')
+    expect(new Set(updates.map(update => update.criado_em))).toEqual(new Set([createdAt]))
+    expect(database.getAtendimento(id)).toMatchObject({ status: 'Concluído', categoria: 'Visita', concluido_em: createdAt })
+  })
+
+  it('mantém separadas duas atualizações escolhidas no mesmo minuto', () => {
+    const condominioId = database.createCondominio({ nome: 'Parque Imperial' })
+    const id = database.createAtendimento({ condominioId, titulo: 'Teste do gerador' })
+    const createdAt = '2026-06-12T17:45:00.000Z'
+
+    database.addUpdate(id, { text: 'Primeiro retorno.', createdAt })
+    database.addUpdate(id, { text: 'Segundo retorno.', createdAt })
+
+    const notes = database.listUpdates(id).filter(update => update.tipo === 'nota')
+    expect(notes).toHaveLength(2)
+    expect(new Set(notes.map(update => update.criado_em)).size).toBe(2)
+  })
+
   it('exclui uma atualização completa sem apagar a criação ou alterar o estado atual', () => {
     const condominioId = database.createCondominio({ nome: 'Parque Central' })
     const id = database.createAtendimento({ condominioId, titulo: 'Câmera offline' })

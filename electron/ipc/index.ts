@@ -8,7 +8,7 @@ import type { WebSyncService } from '../services/web-sync'
 const id = z.number().int().positive()
 const condo = z.object({ nome: z.string().min(1).max(120), endereco: z.string().optional(), contato: z.string().optional(), gestor_nome: z.string().max(160).optional(), gestor_contato: z.string().max(240).optional(), ti_nome: z.string().max(160).optional(), ti_contato: z.string().max(240).optional(), observacoes: z.string().optional() })
 const attendance = z.object({ condominioId: id, titulo: z.string().min(1).max(200), descricao: z.string().optional(), categoria: z.string().optional(), status: z.enum(['Aberto','Em andamento','Concluído']).optional(), prioridade: z.enum(['Baixa','Normal','Alta']).optional(), dataAtendimento: z.string().optional() })
-const attendanceUpdate = z.object({ text: z.string().trim().max(5000).optional(), categoria: z.string().trim().min(1).max(120).optional(), status: z.enum(['Aberto','Em andamento','Concluído']).optional(), hasAttachments: z.boolean().optional() })
+const attendanceUpdate = z.object({ text: z.string().trim().max(5000).optional(), categoria: z.string().trim().min(1).max(120).optional(), status: z.enum(['Aberto','Em andamento','Concluído']).optional(), hasAttachments: z.boolean().optional(), createdAt: z.string().datetime().optional() })
 const reminder = z.object({ titulo: z.string().trim().min(1).max(200), observacoes: z.string().max(2000).optional(), lembreteEm: z.string().datetime(), atendimentoId: id.optional() })
 
 export function registerIpc(database: TudDatabase, files: FileService, root: string, webSync: WebSyncService) {

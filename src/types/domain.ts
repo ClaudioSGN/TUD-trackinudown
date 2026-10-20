@@ -74,6 +74,7 @@ export interface AtendimentoUpdateInput {
   status?: Status
   categoria?: string
   hasAttachments?: boolean
+  createdAt?: string
 }
 
 export interface Lembrete {
